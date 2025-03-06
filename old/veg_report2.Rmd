@@ -1,0 +1,1318 @@
+---
+title: "R Notebook"
+output: 
+  html_notebook: 
+mainfont: Times New Roman
+---
+
+```{r setup, message=FALSE, warning=TRUE, include=FALSE}
+library(tidyverse)
+library(taxize)
+library(readxl)
+library(gt)
+library(flextable)
+library(officer)
+library(extrafont)
+library(stringi)
+library(cowplot)
+library(lemon)
+library(monochromeR)
+library(vegan)
+options(dplyr.summarise.inform = FALSE)
+source(here::here("super_split.R"))
+#font_import(pattern = "times")
+#loadfonts(device = "win")
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+
+load(here::here("data", "derived", "veg_cleaned.rda"))
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+site_descriptions <- list(
+  "year_site_plot_count" = plot_veg_cover_usda %>%
+    group_by(UnitCode) %>%
+    summarise(year_count = n_distinct(Year_chr),
+              site_count = n_distinct(UniqueID),
+              plot_count = n_distinct(EventID),
+              min_year = min(as.integer(Year_chr)),
+              max_year = max(as.integer(Year_chr))) %>%
+    split(.$UnitCode),
+  "site_list" = plot_veg_cover_usda %>%
+    group_by(UnitCode) %>%
+    distinct(UniqueID) %>%
+    mutate(site = sub('.+_(.+)', '\\1', UniqueID)) %>%
+    split(.$UnitCode),
+  "site_year_list" = plot_veg_cover_usda %>%
+    group_by(UnitCode, Year_chr) %>%
+    distinct(UniqueID) %>%
+    mutate(site = sub('.+_(.+)', '\\1', UniqueID),
+           site_number = as.numeric(str_extract(site, "\\d+"))) %>%
+    arrange(site_number) %>%
+    summarise(site_list = str_flatten_comma(site, last = ", and ")) %>%
+    group_by(UnitCode, site_list) %>%
+    summarise(year_list = str_flatten_comma(Year_chr, last = ", and "),
+              year_name = str_flatten(Year_chr, collapse = "_")) %>%
+    super_split(UnitCode, year_name),
+  "caco_site_list" = veg %>%
+    filter(UnitCode == "CACO") %>%
+    group_by(UnitCode) %>%
+    distinct(UniqueID) %>%
+    mutate(site = sub('.+_(.+)', '\\1', UniqueID)) %>%
+    split(.$UnitCode)
+)
+```
+
+##### **Site Descriptions**
+|   At Assateague Island National Seashore, `r site_descriptions$year_site_plot_count$ASIS$site_count` sites were monitored biannually across `r site_descriptions$year_site_plot_count$ASIS$year_count` sampling events between `r site_descriptions$year_site_plot_count$ASIS$min_year` to `r site_descriptions$year_site_plot_count$ASIS$max_year` at a total of `r site_descriptions$year_site_plot_count$ASIS$plot_count` plots. Assateague Island is barrier island on the Atlantic Coasts of Maryland (Worchester County) and Virginia (Accomack County) that consists of beach, dune, and back-barrier marsh habitats. Previously published monitoring reports for Assateague include Patenaude and Pooler (2010a and 2011a) and Nicosia (2013a).
+|   At Cape Cod National Seashore, `r length(site_descriptions$caco_site_list$CACO$site)` sites were monitored between `r site_descriptions$year_site_plot_count$CACO$min_year` to `r site_descriptions$year_site_plot_count$CACO$max_year`. However, these sites were not monitored consistently across the same years because the study plan at this park was designed specifically for monitoring change at individual sites (rather than the entire park) following several different planned restoration projects. Given the difference in the study design as compared to the other six parks, we have excluded the data from Cape Cod from this analyses, although note that the park has published a monitoring report summarizing the monitoring data from 2003, 2008, and 2013 (Smith, 2015).
+|   At Colonial National Historical Park, `r site_descriptions$year_site_plot_count$COLO$site_count` sites consisting of `r site_descriptions$year_site_plot_count$COLO$plot_count` plots were monitored across `r site_descriptions$year_site_plot_count$COLO$year_count` sampling events between `r site_descriptions$year_site_plot_count$COLO$min_year` to `r site_descriptions$year_site_plot_count$COLO$max_year.` However, sites `r site_descriptions$site_year_list$COLO$2008_2010$site_list` were measured between `r site_descriptions$site_year_list$COLO$2008_2010$year_list`, but were then replaced by sites `r site_descriptions$site_year_list$COLO$2012_2014_2016$site_list` in `r site_descriptions$site_year_list$COLO$2012_2014_2016$year_list` due to time and access constraints. Colonial National Historical Park lies within the Atlantic Coastal Plain (York County, Virginia) and is bisected by the York and James Rivers which feed into the Chesapeake Bay. Although the majority (80%) of the managed area at Colonial is comprised of upland pine and hardwood forest, wetland habitats within the park include streams, ponds, swamps, and marshes. Previously published monitoring reports for Colonial include Patenaude and Pooler (2010b and c) and Nicosia (2013b and 2015a).
+|   At Fire Island National Seashore, `r site_descriptions$year_site_plot_count$FIIS$site_count` sites were monitored biannually across `r site_descriptions$year_site_plot_count$FIIS$year_count` sampling events between `r site_descriptions$year_site_plot_count$FIIS$min_year` to `r site_descriptions$year_site_plot_count$FIIS$max_year` at a total of `r site_descriptions$year_site_plot_count$FIIS$plot_count` plots, with the exception of site F6 which was not measured in 2013. Fire Island is barrier island on the Atlantic Coast of Long Island (Suffolk County, New York) that consists of beach, dune, maritime forest, and back-barrier marsh habitats. Previously published monitoring reports for Assateague include Patenaude and Pooler (2010a and 2011a) and Nicosia (2013a).Previously published monitoring reports for Fire Island include Patenaude and Pooler (2010d and 2010e), Nicosia and Pooler (2012a and 2012b), and Nicosia (2015b).
+|   At Gateway National Recreation Area , `r site_descriptions$year_site_plot_count$GATE$site_count` sites were monitored biannually across `r site_descriptions$year_site_plot_count$GATE$year_count` sampling events between `r site_descriptions$year_site_plot_count$GATE$min_year` to `r site_descriptions$year_site_plot_count$max_year` at a total of `r site_descriptions$year_site_plot_count$GATE$plot_count` plots. However, note that only site 1 site - `r site_descriptions$site_year_list$GATE$2014$site_list` - was measured in 2014. Gateway National Recreation Area consists of three units including the Jamaica Bay unit in Brooklyn (New York), the Staten Island unit (New York), and the Sandy Hook unit (Monmouth County, New Jersey), however only the Sandy Hook unit was sampled as part of the NCBN salt marsh vegetation monitoring protocol. The Sandy Hook unit consists of a sand spit with beach, dune, and back-barrier marsh habitats. Previously published monitoring reports for Gateway include Patenaude and Pooler (2011b) and Nicosia (2013c and 2015c).
+|   At George Washington Birthplace National Monument, only 1 site was measured biannually accross `r site_descriptions$year_site_plot_count$GEWA$year_count` sampling events between `r site_descriptions$year_site_plot_count$GEWA$min_year` to `r site_descriptions$year_site_plot_count$GEWA$max_year` at a total of `r site_descriptions$year_site_plot_count$plot_count` plots. George Washington Birthplace sits at the confluence of Popes Creek and the Potomac River (Westmoreland County, Virginia) and includes wetland habitats such as coastal hardwood forests, beaches, dunes, and marshes. Previously published monitoring reports for George Washington Birthplace include Patenaude and Pooler (2010g and 2011c) and Nicosia (2013d).
+|   At Sagamore Hill National Historic Site, only 1 site was measured biannually across `r site_descriptions$year_site_plot_count$SAHI$year_count` sampling events between `r site_descriptions$year_site_plot_count$SAHI$min_year` to `r site_descriptions$year_site_plot_count$SAHI$max_year` at a total of `r site_descriptions$year_site_plot_count$SAHI$plot_count` plots. Sagamore Hill is located adjacent to Cold Spring Harbor on the Cove Neck Peninsula in eastern Long Island (New York). Coastal wetland habitats in the park include coastal forests, dunes, and salt marshes. Previously published monitoring reports for Sagamore Hill include Patenaude and Pooler (2010h), Nicosia and Pooler (2012c), and Nicosia (2015d).
+|   Note that parks will be referred to with their respective four-letter unit codes throughout the remainder of the text (Table 1). Additional details of the monitoring scheme used at each park are presented in Table 1.    
+&nbsp;
+
+![Figure.1](veg_nekton_site_map.jpg)
+&nbsp;
+
+```{r set flextable and color defaults, message=FALSE, warning=FALSE, include=FALSE}
+set_flextable_defaults(
+  font.size = 12,
+  font.family = "times new roman",
+  padding = 1
+  )
+
+park_pal <- c("#ef476f", "#f78c6b", "#ffd166", "#0bd59d", "#118ab2", "#073b4c"#, "#6E51AE" 
+              )
+asis_pal <- monochromeR::generate_palette("#ef476f", modification = "go_lighter", n_colours = 9)
+#caco_pal <- monochromeR::generate_palette("#f78c6b", modification = "go_lighter", n_colours = 2)
+colo_pal <- monochromeR::generate_palette("#f78c6b", modification = "go_lighter", n_colours = 8)
+fiis_pal <- monochromeR::generate_palette("#ffd166", modification = "go_lighter", n_colours = 9)
+gate_pal <- monochromeR::generate_palette("#0bd59d", modification = "go_lighter", n_colours = 3)
+gewa_pal <- "#118ab2"
+sahi_pal <- "#073b4c"
+site_pal <- c(asis_pal, #caco_pal, 
+              colo_pal, fiis_pal, gate_pal, gewa_pal, sahi_pal)
+```
+
+```{r Table 1, echo=FALSE, message=FALSE, warning=FALSE}
+plot_veg_cover_usda %>%
+  group_by(UnitCode) %>%
+  summarise(site_count = n_distinct(UniqueID),
+            plot_count = n_distinct(EventID),
+            min_year = min(as.numeric(Year_chr)),
+            max_year = max(as.numeric(Year_chr)),
+            sample_events = n_distinct(Year_chr),
+            years_sampled = toString(unique(sort(Year_chr))),
+            sites = toString(unique(sort(stri_extract(UniqueID, regex = "(?<=_).*"))))) %>% 
+  mutate(full_park_name = case_when(
+    UnitCode == "ASIS" ~ "Assateague Island National Seashore",
+    #UnitCode == "CACO" ~ "Cape Cod National Seashore",
+    UnitCode == "COLO" ~ "Colonial National Historical Park",
+    UnitCode == "FIIS" ~ "Fire Island National Seashore",
+    UnitCode == "GATE" ~ "Gateway National Recreation Area",
+    UnitCode == "GEWA" ~ "George Washington Birthplace National Monument",
+    UnitCode == "SAHI" ~ "Sagamore Hill National Historic Site"
+  ),
+    State = case_when(
+    UnitCode == "ASIS" ~ "MD, VA",
+    #UnitCode == "CACO" ~ "MA",
+    UnitCode == "COLO" ~ "VA",
+    UnitCode == "FIIS" ~ "NY",
+    UnitCode == "GATE" ~ "NJ, NY",
+    UnitCode == "GEWA" ~ "VA",
+    UnitCode == "SAHI" ~ "NY"
+        )) %>%
+flextable(., col_keys = c("full_park_name", "UnitCode", "State", "site_count", "sites", "plot_count", "years_sampled", "sample_events")) %>%
+  align(., align = "center", part = "all") %>%
+  set_table_properties(., width = 1, layout = "autofit") %>%
+  add_header_lines(., values = c("Table 1. Site count, plot count, monitoring years, and count of sampling events at each park utilizing the NCBN salt marsh vegetation monitoring protocol.")) %>%
+  set_header_labels(., full_park_name = "Park Unit", UnitCode = "Unit Code", State = "Location", site_count = "Number of Sites", sites = "Site List", plot_count = "Number of Plots", years_sampled = "Sample Years", sample_events = "Sampling Events") %>%
+  align(., i = 1, align = "left", part = "header") %>%
+  border_inner_h(., border = fp_border(color = "transparent"), part = "body") %>%
+  padding(., part = "body", padding.top = 3, padding.bottom = 3) 
+```
+##### *Method: Sampling Protocols*
+|   x, y, z.
+&nbsp;
+
+##### *Methods: Data Analyses*
+|   In many instances, the total percent cover was recorded as adding to over 100%. In order to standardize the percent cover values between plots, we converted the percent cover of each species to relative percent cover by dividing the percent cover of each species in a plot by the total plant cover of the entire plot. The frequency of occurrence for each species was calculated as the proportion of plots at a site in which a species was found. 
+|    We compared changes in the salt marsh plant community over time within the 6 park units using the following metrics: average total plot cover, average plot-level species richness, maximum plot-level species richness, total park-level species richness, and the number of species unique to each park. Average plot-level species richness represents the average number of species recorded in each plot. Maximum plot-level species richness was derived from the plot with the highest species richness found among all plots at each park. Total park-level species richness was calculated as the total number of distinct species found across all plots at each park. The number of unique species at each park represents the count of species at a park that were not found at the other 5 parks. Shannon's Diversity Index ranges from 0 to infinity, with lower values representing lower diversity. The Shannon index is an information statistic index, which means it assumes all species are represented in a sample and that they are randomly sampled. Simpson's Diversity Index ranges from 0 to 1, with 0 representing infinite diversity and 1 representing no diversity. The Simpson index is a dominance index because it gives more weight to common or dominant species. Conversely, the Inverse Simpson Index, which is calculated as the inverse of the Simpson Index (1/D), ranges from 1 to infinity, with lower values representing lower diversity.
+|   With the exception of total park-level species richness and the number of unique species at each park, we first calculated the value of each metric for each plot within each site for each year, and then averaged these plot-level values up to the site-level for each year. Comparisons between parks are presented as bar graphs of park-level averages with the park unit on the x-axis and respective metric on the y-axis. Comparisons over time within each park are presented as line graphs with the sample years on the x-axis and the respective metric on the y-axis, with separate panels for each park unit. Error values and error bars represent the standard error of the site-level yearly values. 
+&nbsp;
+
+##### **Results**
+##### *Total Cover*
+```{r Total Cover, echo=FALSE, message=FALSE, warning=FALSE}
+total_cover <- plot_veg_cover_usda %>%
+  group_by(EventID, UniqueID, UnitCode, Year_chr) %>%
+  summarise(mean_year_plot_total_cover = mean(total_percent_cover, na.rm = TRUE)) %>%
+  group_by(UniqueID, UnitCode, Year_chr) %>%
+  summarise(mean_year_site_total_cover = mean(mean_year_plot_total_cover, na.rm = TRUE)) %>% 
+  group_by(UnitCode, Year_chr) %>%
+  summarise(mean_year_total_cover = mean(mean_year_site_total_cover, na.rm = TRUE),
+            se_year_total_cover = sd(mean_year_site_total_cover)/sqrt(length(mean_year_site_total_cover)))
+```
+
+|   Average total plot cover decreased over the study period at all parks, although the decrease in total cover was more pronounced at some parks than others (Figure 2). For example at FIIS, GEWA, and SAHI, total plot cover declined substantially between the first sampling event to the last sampling event and showed no signs of recovery (Figure 2c, 2e, and 2f). Alternatively, total plot cover at ASIS, COLO, and GATE declined from the beginning of the study period and appeared to reach a low in 2014, 2012, and 2016 (respectively), but then appeared to recover during the following sampling events (Figure 2a 2b, and 2d).
+&nbsp;
+
+```{r Figure 2, echo=FALSE, message=FALSE, warning=FALSE}
+ggdraw(total_cover %>%
+  mutate(Year = as.Date(paste0(Year_chr, "-01-01"))) %>%
+  ggplot(., aes(x = Year, y = mean_year_total_cover, color = UnitCode)) +
+  geom_line(show.legend = F) +
+  geom_errorbar(aes(ymin = mean_year_total_cover - se_year_total_cover, ymax = mean_year_total_cover + se_year_total_cover), color = "black") +
+  geom_point(aes(fill = UnitCode), show.legend = F, shape = 21, color = "black", size = 2) +
+  geom_text(data = . %>%
+              ungroup() %>%
+              distinct(UnitCode) %>%
+              mutate(letter = paste0("(",LETTERS[1:n()], ")"),
+                     f = pmap_chr(list(letter, UnitCode), function(a, b) deparse(bquote(bold(.(a)~plain(.(b))))))),
+    aes(x = structure(-Inf, class = "Date"), y =  Inf, label = f),
+            hjust = -0.2, vjust = 2, size  = 3.5, fontface = "bold", family = "serif", parse = T, inherit.aes = F) +
+  scale_color_manual(values = park_pal) +
+  scale_fill_manual(values = park_pal) +
+  lemon::facet_rep_wrap(~UnitCode, scales = "free_x") +
+  scale_y_continuous(limits = c(0,160), name = "Average total plot cover (%)", sec.axis = dup_axis()) +
+  scale_x_date(expand = c(.04, 0), sec.axis = dup_axis(), date_labels = "'%y") +
+  labs(caption = bquote(bold("Figure 2.")~"Average total plot cover at each park.")) +
+  lfeheR::theme(base_size = 12) +
+  theme(
+    text = element_text(family = "serif", size = 12),
+    legend.position = "none",
+    axis.title.y = element_text(margin = margin(r = 10, unit = "pt")),
+    panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+    strip.text = element_blank(),
+    plot.caption = element_text(size = 12, hjust = -0.1, color = "transparent")
+  )) +
+  draw_label(bquote(bold("Figure 2.")~"Average total plot cover (%) at each park."), fontfamily = "serif", x = 0.02, y = 0.04, size = 12, hjust = 0)
+```
+&nbsp;
+
+##### *Species Richness*
+```{r Species richness, message=TRUE, warning=TRUE, include=FALSE}
+# plot_level species richness
+plot_species_richness <- plot_veg_cover_usda %>%
+  group_by(EventID, UniqueID, UnitCode, Year_chr) %>%
+  summarise(species_count = n_distinct(SciName_cor)) %>%
+  group_by(UniqueID, UnitCode, Year_chr) %>%
+  summarise(mean_year_site_plot_species_richness = mean(species_count, na.rm = TRUE),
+            max_year_site_plot_species_richness = max(species_count)) %>%
+  group_by(UnitCode, Year_chr) %>%
+  summarise(mean_year_plot_species_richness = mean(mean_year_site_plot_species_richness, na.rm = TRUE),
+            max_year_plot_species_richness = max(max_year_site_plot_species_richness),
+            se_year_plot_species_richness = sd(mean_year_site_plot_species_richness)/sqrt(length(mean_year_site_plot_species_richness))) 
+  
+# park-level species richness for each year across all years
+park_species_richness_per_yr <- plot_veg_cover_usda %>%
+  group_by(UnitCode, Year_chr) %>%
+  summarise(plot_num = n_distinct(EventID),
+            site_num = n_distinct(UniqueID),
+            total_richness = n_distinct(SciName_cor))
+
+# park-level species richness across all years
+park_species_richness_all_yrs <- plot_veg_cover_usda %>%
+  group_by(UnitCode) %>%
+  summarise(plot_num = n_distinct(EventID),
+            site_num = n_distinct(UniqueID),
+            total_richness = n_distinct(SciName_cor)) 
+
+# unique species found in each park (i.e., species not found in any other parks)
+park_unique_species <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(UnitCode, SciName_cor) %>%
+  unique() %>%
+  group_by(SciName_cor) %>%
+  reframe(parks = as.list(unique(UnitCode))) %>%
+  group_by(SciName_cor) %>%
+  mutate(park_count = length(parks)) %>%
+  filter(park_count == 1) %>%
+  unnest(parks) %>%
+  select("UnitCode" = parks, SciName_cor, park_count)
+  
+# count of unique species found in each park  
+park_unique_species_count <- park_unique_species %>%
+  group_by(UnitCode) %>%
+  summarise(n_unique = n_distinct(SciName_cor))
+
+# count of unique species per year
+park_unique_species_count_per_year <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(UnitCode, Year_chr, SciName_cor) %>%
+  unique() %>%
+  left_join(., park_unique_species, by = c("UnitCode", "SciName_cor")) %>%
+  filter(!is.na(park_count)) %>%
+  group_by(UnitCode, Year_chr) %>%
+  summarise(n_unique = n_distinct(SciName_cor))
+
+species_richness_results <- list(
+  "total_unique_species" = plot_veg_cover_usda %>% 
+    ungroup() %>% 
+    select(SciName_cor) %>% 
+    summarise(n_distinct(SciName_cor)) %>%  
+    pull() %>% 
+    as.numeric(),
+  "min_richness" = plot_species_richness %>%
+    ungroup() %>% 
+    slice_min(order_by = mean_year_plot_species_richness, n = 1) %>% 
+    mutate(m = round(mean_year_plot_species_richness, 1)) %>% pull(m),
+  "max_richness" = plot_species_richness %>% 
+    ungroup() %>% 
+    slice_max(order_by = mean_year_plot_species_richness, n = 1) %>% 
+    mutate(m = round(mean_year_plot_species_richness, 1)) %>% 
+    pull(m),
+  "max_richness_df" = plot_species_richness %>% 
+    select(UnitCode, Year_chr, max_year_plot_species_richness) %>%
+    mutate(Year_chr = paste0("a_", Year_chr)) %>%
+    super_split(UnitCode, Year_chr),
+  "park_richness_df" = park_species_richness_per_yr %>% 
+    select(UnitCode, Year_chr, total_richness) %>%
+    mutate(Year_chr = paste0("a_", Year_chr)) %>%
+    super_split(UnitCode, Year_chr),
+  "unique_species_df" = park_unique_species_count_per_year %>%
+    mutate(Year_chr = paste0("a_", Year_chr)) %>%
+    super_split(UnitCode, Year_chr)
+)
+```
+
+|   In total, we identified `r species_richness_results$total_unique_species` unique plant species within the salt marshes at all 6 parks. Average plot-level species richness varied little from year to year at all parks throughout the study period (range: `r species_richness_results$min_richness` to `r species_richness_results$max_richness` species per plot) (Figure 3). Maximum plot-level species richness decreased across the entire study period at all parks except COLO and GATE (Figure 3). At COLO, maximum plot-level species richness declined from `r species_richness_results$max_richness_df$COLO$a_2008$max_year_plot_species_richness` in 2008 to `r species_richness_results$max_richness_df$COLO$a_2012$max_year_plot_species_richness` in 2012, but then increased back to `r species_richness_results$max_richness_df$COLO$a_2016$max_year_plot_species_richness` in 2016 (Figure 3b). At GATE, maximum plot-level species richness doubled from `r species_richness_results$max_richness_df$GATE$a_2014$max_year_plot_species_richness` in 2014 to `r species_richness_results$max_richness_df$GATE$a_2018$max_year_plot_species_richness` in 2018 (Figure 3d). Notably, maximum plot-level species richness at FIIS increased from `r species_richness_results$max_richness_df$FIIS$a_2009$max_year_plot_species_richness` in 2009 to `r species_richness_results$max_richness_df$FIIS$a_2015$max_year_plot_species_richness` in 2015 before decreasing substantially to `r species_richness_results$max_richness_df$FIIS$a_2017$max_year_plot_species_richness` in 2017 (Figure 3c). Total park-level species richness decreased across the entire study period at all parks except COLO and GATE (Figure 4). Notably, total park-level species richness declined dramatically at both ASIS and GEWA. At ASIS, total park-level species richness declined from a high of `r species_richness_results$park_richness_df$ASIS$a_2010$total_richness` in 2010 to a low of `r species_richness_results$park_richness_df$ASIS$a_2012$total_richness` in 2012 (Figure 4a). Similarly, at GEWA, total park-level species richness declined from a high of `r species_richness_results$park_richness_df$GEWA$a_2008$total_richness` in 2008 to a low of `r species_richness_results$park_richness_df$GEWA$a_2010$total_richness` in 2010 (Figure 4e). Conversely, total park-level species richness increased from a low of `r species_richness_results$park_richness_df$COLO$a_2008$total_richness` in 2008 to a high of `r species_richness_results$park_richness_df$COLO$a_2016$total_richness` in 2016 at COLO (Figure 5c), and also increased from a low of `r species_richness_results$park_richness_df$GATE$a_2014$total_richness` in 2014 to a high of `r species_richness_results$park_richness_df$GATE$a_2018$total_richness` in 2018 at GATE (Figure 4d). Finally, the number of species unique to each park decreased across the entire study period at all parks except COLO and GATE (Figure 4). At COLO, the number of species unique to the park doubled from `r species_richness_results$unique_species_df$COLO$a_2008$n_unique` in 2008 to `r species_richness_results$unique_species_df$COLO$a_2016$n_unique` in 2016 (Figure 4b). At GATE, the number of species unique to the park increased substantially from a low of `r species_richness_results$unique_species_df$GATE$a_2014$n_unique` in 2014 to a high of `r species_richness_results$unique_species_df$GATE$a_2018$n_unique` in 2018 (Figure 4d).
+&nbsp;
+
+```{r Figure 3, echo=FALSE, message=TRUE, warning=TRUE, fig.align = "center", fig.cap= "Figure 3. ..." }
+ggdraw(plot_species_richness %>%
+  pivot_longer(., cols = c(mean_year_plot_species_richness, max_year_plot_species_richness), names_to = "richness_metric", values_to = "richness") %>%
+  mutate(se_year_plot_species_richness = if_else(richness_metric == "max_year_plot_species_richness", NA, se_year_plot_species_richness)) %>%
+  mutate(Year = as.Date(paste0(Year_chr, "-01-01"))) %>%
+  ungroup() %>%
+  ggplot(., aes(x = Year, y = richness, color = UnitCode, fill = UnitCode, group = richness_metric)) +
+  geom_line(show.legend = F) +
+  geom_errorbar(aes(ymin = richness - se_year_plot_species_richness, ymax = richness + se_year_plot_species_richness), color = "black") +
+  geom_point(aes(shape = richness_metric), show.legend = T, size = 2, color = "black") +
+  geom_text(data = . %>% 
+              ungroup() %>% 
+              distinct(UnitCode) %>%
+              mutate(letter = paste0("(",LETTERS[1:n()], ")"),
+                     f = pmap_chr(list(letter, UnitCode), function(a, b) deparse(bquote(bold(.(a)~plain(.(b))))))),
+    aes(x = structure(-Inf, class = "Date"), y =  Inf, label = f),
+            hjust = -0.2, vjust = 2, size  = 3.5, fontface = "bold", family = "serif", parse = T, inherit.aes = F) +
+  scale_color_manual(values = park_pal) +
+  scale_fill_manual(values = park_pal) +
+  scale_shape_manual(values = c(22, 24), breaks = c("mean_year_plot_species_richness", "max_year_plot_species_richness"), labels = c("Average plot-level species richness   ", "Max plot-level species richness")) +
+  lemon::facet_rep_wrap(~UnitCode, scales = "free_x", repeat.tick.labels = F) +
+  scale_y_continuous(limits = c(0,11), name = "Plot-level species richness (n)", labels = function(x) sprintf("%0.0f", x), sec.axis = dup_axis()) +
+  scale_x_date(date_labels = "'%y", sec.axis = dup_axis()) +
+  guides(color = "none", fill = "none") +
+  labs(caption = bquote(bold("Figure 3.")~"Average (square points) and maximum (triangle points) plot-level species richness at each park.")) +
+  lfeheR::theme(base_size = 12) +
+  theme(
+    text = element_text(family = "serif", size = 12),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key = element_blank(),
+    legend.margin = margin(t = -10, unit = "pt"),
+    axis.title.y = element_text(margin = margin(r = 10, unit = "pt")),
+    panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+    strip.text = element_blank(),
+    plot.caption = element_text(size = 12, hjust = -0.2, color = "transparent")
+  )) +
+  draw_label(bquote(bold("Figure 3.")~"Average (square points) and maximum (triangle points) plot-level species richness at each park."), x = 0.02, y = 0.04, fontfamily = "serif", size = 12, hjust = 0)
+```
+&nbsp;
+
+```{r Figure 4, echo=FALSE, message=TRUE, warning=TRUE, fig.align = "center", fig.cap= "Figure 4. ..." }
+ggdraw(park_species_richness_per_yr %>%
+  left_join(., park_unique_species_count_per_year, by = c("UnitCode", "Year_chr")) %>%
+  pivot_longer(., cols = c(total_richness, n_unique), names_to = "richness_metric", values_to = "richness") %>%
+  mutate(Year = as.Date(paste0(Year_chr, "-01-01")),
+         richness = if_else(is.na(richness), 0, richness)) %>%
+  ungroup() %>%
+  ggplot(., aes(x = Year, y = richness, color = UnitCode, fill = UnitCode, group = richness_metric)) +
+  geom_line(show.legend = F) +
+  geom_point(aes(shape = richness_metric), show.legend = T, size = 2, color = "black") +
+  geom_text(data = . %>% 
+              ungroup() %>% 
+              distinct(UnitCode) %>%
+              mutate(letter = paste0("(",LETTERS[1:n()], ")"),
+                     f = pmap_chr(list(letter, UnitCode), function(a, b) deparse(bquote(bold(.(a)~plain(.(b))))))),
+    aes(x = structure(-Inf, class = "Date"), y =  Inf, label = f),
+            hjust = -0.2, vjust = 2, size  = 3.5, fontface = "bold", family = "serif", parse = T, inherit.aes = F) +
+  scale_color_manual(values = park_pal) +
+  scale_fill_manual(values = park_pal) +
+  scale_shape_manual(values = c(21, 23), breaks = c("total_richness", "n_unique"), labels = c("Total park-level species richness   ", "Unique species count")) +
+  lemon::facet_rep_wrap(~UnitCode, scales = "free_x", repeat.tick.labels = F) +
+  scale_y_continuous(limits = c(0,45), name = "Park-level species richness (n)", labels = function(x) sprintf("%0.0f", x), sec.axis = dup_axis()) +
+  scale_x_date(date_labels = "'%y", sec.axis = dup_axis()) +
+  guides(color = "none", fill = "none") +
+  labs(caption = bquote(bold("Figure 4.")~"Park-level species richness (circle points) and count of species unique to each park (diamond points).")) +
+  lfeheR::theme(base_size = 12) +
+  theme(
+    text = element_text(family = "serif", size = 12),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.key = element_blank(),
+    legend.margin = margin(t = -10, unit = "pt"),
+    axis.title.y = element_text(margin = margin(r = 10, unit = "pt")),
+    panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+    strip.text = element_blank(),
+    plot.caption = element_text(size = 12, hjust = 0, color = "transparent")
+  ),
+  ylim = c(-0.05,1)) +
+  draw_label(bquote(bold("Figure 4.")~"Total park-level species richness (circle points) and count of species unique to each park (diamond"), x = 0.02, y = 0.03, fontfamily = "serif", hjust = 0, size = 12) +
+  draw_label(bquote(plain("points).")), x = 0.02, y = -0.02, fontfamily = "serif", hjust = 0, size = 12)
+```
+&nbsp;
+
+##### *Rare, Threatened & Endangered Species*
+```{r Rare species, message=TRUE, warning=TRUE, include=FALSE}
+park_rare_species <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(UnitCode, SciName_cor, starts_with("rare_")) %>%
+  mutate(is_rare = case_when(if_any(starts_with("rare_"), ~ .x == "T") ~ "T")) %>%
+  filter(is_rare == "T")
+```
+
+|   Only `r length(park_rare_species)` rare species - *`r park_rare_species %>% summarise(m = unique(SciName_cor)) %>% pull()`* - was identified. *`r park_rare_species %>% filter(UnitCode == "GATE") %>% summarise(m = unique(SciName_cor)) %>% pull()`* is considered rare by the state of New Jersey and was only found in one plot at GATE in 2017. No federally listed threatened or endangered species were found at any of the parks.
+&nbsp;
+
+##### *Invasive, Noxious & Prohibited Species*
+```{r Invasive species, message=TRUE, warning=TRUE, include=FALSE}
+park_invasive_species <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(UnitCode, UniqueID, EventID, Year_chr, SciName_cor, rel_percent_cover, starts_with("invasive_")) %>%
+  mutate(is_invasive = case_when(if_any(starts_with("invasive_"), ~ .x == "T") ~ "T")) %>%
+  filter(is_invasive == "T")
+
+invasive_results <- list(
+  "total_invasive_species" = park_invasive_species %>%
+    summarise(n_distinct(SciName_cor)) %>%
+    pull() %>%
+    as.numeric(),
+  "count_df" = park_invasive_species %>%
+    select(UnitCode, SciName_cor) %>%
+    group_by(UnitCode) %>%
+    summarise(species_count = n_distinct(SciName_cor)) %>%
+    split(.$UnitCode),
+  "species_names_df" =
+    park_invasive_species %>%
+    select(UnitCode, SciName_cor) %>%
+    group_by(UnitCode) %>%
+    distinct() %>%
+    arrange(SciName_cor) %>%
+    split(.$UnitCode),
+  "species_year_df" = park_invasive_species %>%
+    group_by(UnitCode, Year_chr, SciName_cor) %>% 
+    summarise(mean_cover = mean(rel_percent_cover)) %>% 
+    group_by(UnitCode, SciName_cor) %>% 
+    mutate(n_years = n_distinct(Year_chr)) %>% 
+    ungroup() %>% 
+    mutate(Year = as.integer(Year_chr)) %>% 
+    mutate(mean_cover = round(mean_cover,0),
+           Year_chr = paste0("a_", Year_chr),
+           SciName_cor = janitor::make_clean_names(SciName_cor)) %>%
+    super_split(UnitCode, Year_chr, SciName_cor),
+  "single_year" = park_invasive_species %>%
+    group_by(UnitCode, Year_chr, SciName_cor) %>% 
+    summarise(mean_cover = mean(rel_percent_cover)) %>% 
+    group_by(UnitCode, SciName_cor) %>% 
+    mutate(n_years = n_distinct(Year_chr)) %>%
+    filter(n_years == 1) %>%
+    ungroup() %>%
+    select(UnitCode, SciName_cor) %>%
+    distinct() %>%
+    split(.$UnitCode)
+)
+```
+
+|   Of the `r species_richness_results$total_unique_species` unique species identified across all parks, `r invasive_results$total_invasive_species` were considered invasive, noxious, or prohibited within their respective states. No invasive species were found in ASIS, GEWA, or SAHI. At COLO, only `r invasive_results$count_df$COLO$species_count` species - *`r invasive_results$species_names_df$COLO$SciName_cor`* - was considered invasive by the Virginia Department of Conservation and Recreation (<https://www.dcr.virginia.gov/natural-heritage/invsppdflist>). At FIIS, `r invasive_results$count_df$FIIS$species_count` species, including *`r invasive_results$species_names_df$FIIS$SciName_cor[1]`*, *`r invasive_results$species_names_df$FIIS$SciName_cor[2]`*, and *`r invasive_results$species_names_df$FIIS$SciName_cor[3]`*, were considered invasive by the state of New York (State of New York, 2022). At GATE, `r invasive_results$count_df$GATE$species_count` species, including *`r invasive_results$species_names_df$GATE$SciName_cor[1]`*, *`r invasive_results$species_names_df$GATE$SciName_cor[2]`*, *`r invasive_results$species_names_df$GATE$SciName_cor[3]`*, and *`r invasive_results$species_names_df$GATE$SciName_cor[4]`* were considered invasive by the state of New York (State of New York, 2022). Notably, *Phragmites australis* was found in multiple years at both FIIS and GATE (Figure 5b). Of the `r invasive_results$total_invasive_species` invasive species found, `r sum(map_dbl(invasive_results$single_year, ~nrow(.x)))` species were found in only 1 year, including *Najas minor* at COLO in 2016, *Elaeagnus umbellata* and *Polygonum perfoliatum* at FIIS in 2015, and *Rubus phoenicolasius* at GATE in 2018. At FIIS, the average relative cover of *Phragmites australis* declined from `r invasive_results$species_year_df$FIIS$a_2009$phragmites_australis$m`% in 2009 to `r invasive_results$species_year_df$FIIS$a_2015$phragmites_australis$m`% in 2015, but then increased back to `r invasive_results$species_year_df$FIIS$a_2017$phragmites_australis$m`% in 2017 (Figure 5a). At GATE however, the average relative cover of *Phragmites australis* declined from `r invasive_results$species_year_df$GATE$a_2012$phragmites_australis$m`% in 2012 to `r invasive_results$species_year_df$GATE$a_2016$phragmites_australis$m`% in 2016 (Figure 5b). Also at GATE, the average relative coverage of *Artemisia vulgaris* increased substantially from `r invasive_results$species_year_df$GATE$a_2014$artemisia_vulgaris$m`% in 2014 to `r invasive_results$species_year_df$GATE$a_2018$artemisia_vulgaris$m`% in 2018 (Figure 5b). Similarly, the average relative cover of *Lonicera japonica* at GATE increased from `r invasive_results$species_year_df$GATE$a_2012$lonicera_japonic$m`% in 2012 to `r invasive_results$species_year_df$GATE$a_2018$lonicera_japonic$m`% in 2018 (Figure 5b).
+&nbsp;
+
+```{r Figure 5, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3, out.width=6.5, out.height= 3.5}
+ggdraw(park_invasive_species %>%
+  group_by(UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+  summarise(mean_site_cover = mean(rel_percent_cover)) %>%
+  group_by(UnitCode, Year_chr, SciName_cor) %>%
+  summarise(mean_cover = mean(mean_site_cover),
+            se_cover = sd(mean_site_cover)/sqrt(length(mean_site_cover))) %>%
+  group_by(UnitCode, SciName_cor) %>%
+  mutate(n_years = n_distinct(Year_chr)) %>%
+  ungroup() %>%
+  mutate(Year = as.Date(paste0(Year_chr, "-01-01")),
+         SciName_lab = paste0(SciName_cor, "   ")) %>%
+  filter(n_years > 1) %>%
+  ggplot(., aes(x = Year, y = mean_cover)) +
+    geom_errorbar(aes(ymin = mean_cover - se_cover, ymax = mean_cover + se_cover, group = SciName_lab), color = "black", width = 100) +
+    geom_line(aes(color = SciName_lab)) +
+    geom_point(aes(fill = SciName_lab), shape = 21, size = 2, color = "black") +
+    geom_text(data = . %>%
+              ungroup() %>%
+              distinct(UnitCode) %>%
+              mutate(letter = paste0("(",LETTERS[1:n()], ")"),
+                     f = pmap_chr(list(letter, UnitCode), function(a, b) deparse(bquote(bold(.(a)~plain(.(b))))))),
+    aes(x = structure(-Inf, class = "Date"), y =  Inf, label = f),
+            hjust = -0.2, vjust = 2, size  = 3.5, fontface = "bold", family = "serif", parse = T, inherit.aes = F) +
+    lemon::facet_rep_wrap(~UnitCode, repeat.tick.labels = T) +
+    scale_y_continuous(name = "Average relative cover of\ninvasive species (%)", sec.axis = dup_axis()) +
+    scale_x_date(expand = c(.04, 0), sec.axis = dup_axis(), date_labels = "'%y") +
+    guides(color = guide_legend(title = "Species:"), fill = guide_legend(title = "Species:")) +
+    labs(caption = bquote(bold("Figure 5.")~"Average relative percent cover (%) of invasive species at FIIS (a) and GATE (b).")) +
+    lfeheR::theme(base_size = 12) +
+    theme(
+      axis.title.y = element_text(margin = margin(r = 10, unit = "pt")),
+      text = element_text(family = "serif", size = 12),
+      legend.key = element_rect(color = "transparent"),
+      legend.text = element_text(face = "italic"),
+      legend.position = "bottom",
+      legend.margin = margin(t = -10, unit = "pt"),
+      panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+      strip.background = element_blank(),
+      strip.text = element_blank(),
+      plot.caption = element_text(size = 12, color = "transparent")
+  )) +
+  draw_label(bquote(bold("Figure 5.")~"Average relative percent cover (%) of invasive species at FIIS (a) and GATE (b)."), x = 0.02, y = 0.04, fontfamily = "serif", hjust = 0, size = 12) 
+```
+&nbsp;
+
+##### *Salinity Tolerance*
+|   At ASIS, the count of species with low and medium salinity tolerance decreased between 2008 to 2018, whereas the count of species with high salinity tolerance remained stable (Figure 6a). Similarly, the frequency of occurrence of species in all salinity tolerance categories remained stable (Figure 6b). However, the average relative cover of species with low salinity tolerance decreased whereas the average relative cover of species with medium salinity tolerance increased, and the average relative cover of species with high salinity tolerance remained stable (Figure 6c). 
+&nbsp;
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+salinity_plot <- function(park) {
+  
+  sal_count <- site_veg_frq_usda %>%
+    filter(UnitCode == park) %>%
+    group_by(UnitCode, Year_chr, SalinityTolerance) %>%
+    filter(SalinityTolerance != "" & !is.na(SalinityTolerance) & SalinityTolerance != "None") %>%
+    summarise(species_count = n_distinct(SciName_cor)) %>%
+    mutate(value_label = as.character(round(species_count,0)))
+  
+  sal_frq <- site_veg_frq_usda %>%
+    filter(UnitCode == park) %>%
+    group_by(UnitCode, Year_chr, SalinityTolerance) %>%
+    filter(SalinityTolerance != "" & !is.na(SalinityTolerance) & SalinityTolerance != "None") %>%
+    summarise(mean_frq = mean(frq)) %>%
+    mutate(value_label = format(round(mean_frq,2), nsmall = 2)) %>%
+    mutate(value_label = if_else(round(mean_frq,2) <= 0.05, NA, format(round(mean_frq,2), nsmall = 2)))
+  
+  sal_cover <- plot_veg_cover_usda %>%
+    filter(UnitCode == park) %>%
+    group_by(UniqueID, UnitCode, Year_chr, SalinityTolerance) %>%
+    filter(SalinityTolerance != "" & !is.na(SalinityTolerance) & SalinityTolerance != "None") %>%
+    summarise(mean_site_cover = mean(rel_percent_cover, na.rm = TRUE)) %>%
+    group_by(UnitCode, Year_chr, SalinityTolerance) %>%
+    summarise(mean_cover = mean(mean_site_cover)) %>%
+    mutate(value_label = if_else(round(mean_cover,0) <= 5, NA, paste0(format(round(mean_cover,0), nsmall = 0)#, "%"
+                                                                      )))
+  
+  labfun <- function(metric_df, metric_name) {
+    f <- metric_df %>%
+      ungroup() %>%
+      mutate(sal = factor(case_when(
+        SalinityTolerance == "High" ~ "High (>18 ppt)   ",
+        SalinityTolerance == "Medium" ~ "Medium (0.5-18 ppt)   ",
+        SalinityTolerance == "Low" ~ "Low (<0.5 ppt)   ",
+        T ~ NA
+      ), levels = c("High (>18 ppt)   ", "Medium (0.5-18 ppt)   ", "Low (<0.5 ppt)   ")),
+      Year = as.Date(paste0(Year_chr, "-01-01"))) %>%
+      filter(!is.na(sal))
+  }
+
+  sal_count2 <- labfun(metric_df = sal_count, metric_name = "species_count")
+  sal_frq2 <- labfun(metric_df = sal_frq, metric_name = "mean_frq")
+  sal_cover2 <- labfun(metric_df = sal_cover, metric_name = "mean_cover")
+
+  ggfun <- function(metric_df2, metric_name, park_name = park){
+    
+    if(metric_name == "species_count") {
+      letter_lab <- "(A)"
+      metric_lab <- "Species count (n)"
+      max_y <- 18
+      value_text_size <- 3.5
+      y_breaks <- seq(0,15, by = 5)
+    } else if(metric_name == "mean_frq") {
+      letter_lab <- "(B)"
+      metric_lab <- "Frequency"
+      max_y <- 0.95
+      y_breaks <- seq(0, 0.8, by = 0.2)
+      value_text_size <- 2.5
+    } else if(metric_name == "mean_cover") {
+      letter_lab <- "(C)"
+      metric_lab <- "Cover (%)"
+      max_y <- 190
+      y_breaks <- seq(0,150, by = 50)
+      value_text_size <- 3.5
+    }
+    
+    if(park_name == "ASIS") {
+      pal <- asis_pal[c(1,5,9)]
+    } else if(park_name == "COLO") {
+      pal <- colo_pal[c(1,5,8)]
+    } else if(park_name == "FIIS") {
+      pal <- fiis_pal[c(1,5,9)]
+    } else if(park_name == "GATE") {
+      pal <- gate_pal
+    } else if(park_name == "GEWA") {
+      pal <- monochromeR::generate_palette("#118ab2", modification = "go_lighter", n_colors = 3)
+    } else if(park_name == "SAHI") {
+      pal <- monochromeR::generate_palette("#073b4c", modification = "go_lighter", n_colors = 3)
+    }
+    
+    if(park_name == "SAHI") {
+      value_text_color <- "white"
+    } else {
+      value_text_color <- "black"
+    }
+    
+    park_lab <- paste0(park_name, ":")
+    
+    if(metric_name == "mean_frq"){
+      x_title_color <- "black"
+    } else {
+      x_title_color <- "transparent"
+    }
+    
+    metric_df2 %>%
+    ggplot(., aes(x = Year, y = eval(sym(metric_name)))) +
+      geom_col(aes(fill = sal), color = "black") +
+      geom_text(aes(label = value_label, group = sal), color = value_text_color, position = position_stack(vjust = 0.5), size = value_text_size, family = "serif", show.legend = FALSE) +
+      annotate("text", label = deparse(bquote(bold(.(letter_lab)))), x = structure(-Inf, class = "Date"), y = Inf, hjust = -0.2, vjust = 2, size = 3.5, fontface = "bold", family = "serif", parse = T) +
+      scale_fill_manual(values = pal, name = "Salinity tolerance:") +
+      scale_x_date(date_breaks = "2 year", date_labels = "'%y") +
+      scale_y_continuous(limits = c(0,max_y), breaks = y_breaks, expand = c(0,0), name = metric_lab, sec.axis = dup_axis()) +
+      guides(fill = guide_legend(reverse = TRUE)) +
+      theme(
+        text = element_text(size = 12, family = "serif", color = "black"),
+        panel.border = element_rect(color = "black", fill = NA),
+        panel.background = element_blank(),
+        panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+        panel.grid.minor = element_blank(),
+        axis.ticks.length.x = unit(0, "pt"),
+        axis.ticks.length.y = unit(-4, "pt"),
+        axis.title.y.right = element_blank(),
+        axis.title.y.left = element_text(size = 12, margin = margin(r = 5, unit = "pt")),
+        axis.text.y.left = element_text(size = 12, color = "black"),
+        axis.title.x = element_text(size = 12, color = x_title_color),
+        axis.text.y.right = element_blank(),
+        axis.text.x = element_text(size = 12, color = "black"),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 12),
+        legend.direction = "horizontal",
+        legend.background = element_rect(fill = "transparent")
+      )
+  }
+  
+  count_plot <- ggfun(metric_df2 = sal_count2, metric_name = "species_count")
+  frq_plot <- ggfun(metric_df2 = sal_frq2, metric_name = "mean_frq") +
+    theme(legend.position = "none")
+  cover_plot <- ggfun(metric_df2 = sal_cover2, metric_name = "mean_cover") +
+    theme(legend.position = "none")
+  
+  legend <- cowplot::get_legend(count_plot)
+  count_plot <- count_plot + theme(legend.position = "none")
+  
+  ggdraw(plot_grid(plot_grid(count_plot, frq_plot, cover_plot, nrow = 1, byrow = T),
+                   plot_grid(NULL, legend, NULL, nrow = 1, byrow = T, rel_widths = c(0.1, 1, 0.1)),
+                   rel_heights = c(1,0.06), nrow = 2))
+}
+```
+
+```{r Figure 6, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3.5, out.width=6.5, out.height=3.5}
+ggdraw(salinity_plot(park = "ASIS"), ylim = c(-0.25,1)) +
+  draw_label(bquote(bold("Figure 6.")~"ASIS (a) species count, (b) average frequency of occurence, and (c) average relative"), x = 0.02, y = -0.08, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("percent cover (%) in each salinity tolerance category. Note that frequency values below 0.05 are not"), x = 0.02, y = -0.14, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("shown."), x = 0.02, y = -0.2, size = 12, fontfamily = "serif", hjust = 0)
+```
+&nbsp;
+
+|   At COLO, the count of species with low and medium salinity tolerance increased between 2008 to 2016, whereas the count of species with high salinity tolerance remained stable (Figure 7a). Similarly, both the frequency of occurrence and average relative cover of species with low salinity tolerance increased substantially whereas the frequency and cover of species with high salinity tolerance decreased over the same time period (Figure 7b and c).
+&nbsp;
+
+```{r Figure 7, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3.5, out.width=6.5, out.height=3.5}
+ggdraw(salinity_plot(park = "COLO"), ylim = c(-0.18,1)) +
+  draw_label(bquote(bold("Figure 7.")~"COLO (a) species count, (b) average frequency of occurence, and (c) average relative"), x = 0.02, y = -0.07, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("percent cover (%) in each salinity tolerance category."), x = 0.02, y = -0.13, size = 12, fontfamily = "serif", hjust = 0)
+```
+&nbsp;
+
+|   At FIIS, the count of species with both low and high salinity tolerance increased between 2009 to 2017, whereas the count of species with medium salinity tolerance remained stable during this time (Figure 8a). The frequency of occurrence of species in all salinity tolerance categories remained stable (Figure 8b). The average relative cover of species with low and medium salinity tolerance initially declined between 2009 to 2013, but then recovered between 2013 to 2017, whereas the average relative cover of species with high salinity tolerance remained stable during this time (Figure 8c).
+&nbsp;
+
+```{r Figure 8, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3.5, out.width=6.5, out.height=3.5}
+ggdraw(salinity_plot(park = "FIIS"), ylim = c(-0.25,1)) +
+  draw_label(bquote(bold("Figure 8.")~"FIIS (a) species count, (b) average frequency of occurence, and (c) average relative"), x = 0.02, y = -0.08, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("percent cover (%) in each salinity tolerance category. Note that frequency values below 0.05 are not"), x = 0.02, y = -0.14, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("shown."), x = 0.02, y = -0.2, size = 12, fontfamily = "serif", hjust = 0)
+```
+&nbsp;
+
+|   At GATE, the count of species in all salinity tolerance categories remained stable between 2010 to 2018 (Figure 9a). The frequency of occurrence and average relative cover of species with medium salinity tolerance increased slightly over the study period (Figure 9b). The frequency of occurrence of species with low salinity tolerance also increased slightly but average relative cover initially increased between 2010 to 2016 but then declined substantially between 2016 and 2018 (Figure 9c).
+&nbsp;
+
+```{r Figure 9, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3.5, out.width=6.5, out.height=3.5}
+ggdraw(salinity_plot(park = "GATE"), ylim = c(-0.25,1)) +
+  draw_label(bquote(bold("Figure 9.")~"GATE (a) species count, (b) average frequency of occurence, and (c) average relative"), x = 0.02, y = -0.08, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("percent cover (%) in each salinity tolerance category. Note that frequency values below 0.05 and"), x = 0.02, y = -0.14, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("cover values below 5% are not shown."), x = 0.02, y = -0.2, size = 12, fontfamily = "serif", hjust = 0)
+```
+&nbsp;
+
+|   At GEWA, the count of species with low and medium salinity tolerance decreased between 2008 to 2012 (Figure 10a). Conversely, the frequency of occurrence of species with low and medium salinity tolerance increased slightly over the study period (Figure 10b). Interestingly, the average relative cover of species with high salinity tolerance increased slightly during the study period, although the average relative cover of species with low and medium salinity tolerance increased substantially between 2008 to 2010, and then declined slightly between 2010 to 2012 (Figure 10c).
+&nbsp;
+
+```{r Figure 10, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3.5, out.width=6.5, out.height=3.5}
+ggdraw(salinity_plot(park = "GEWA"), ylim = c(-0.25,1)) +
+  draw_label(bquote(bold("Figure 10.")~"GEWA (a) species count, (b) average frequency of occurence, and (c) average relative"), x = 0.02, y = -0.08, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("percent cover (%) in each salinity tolerance category. Note that frequency values below 0.05 are not"), x = 0.02, y = -0.14, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("shown."), x = 0.02, y = -0.2, size = 12, fontfamily = "serif", hjust = 0)
+```
+&nbsp;
+
+|   At SAHI, no species with low salinity tolerance were found throughout the entire study period. The count of species with high salinity tolerance decreased between 2009 to 2017 and the count of species with medium salinity tolerance remained stable (Figure 11a). The frequency of occurrence of species with high salinity tolerance increased slightly between 2009 to 2013, but then declined between 2013 to 2017 (Figure 11b). Conversely, the average relative cover of species in both the medium and high salinity tolerance categories declined between 2009 to 2013 but then increased between 2013 to 2017 (Figure 11c). 
+&nbsp;
+
+```{r Figure 11, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=3.5, out.width=6.5, out.height=3.5}
+ggdraw(salinity_plot(park = "SAHI"), ylim = c(-0.25,1))+
+  draw_label(bquote(bold("Figure 11.")~"SAHI (a) species count, (b) average frequency of occurence, and (c) average relative"), x = 0.02, y = -0.08, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("percent cover (%) in each salinity tolerance category. Note that frequency values below 0.05 are not"), x = 0.02, y = -0.14, size = 12, fontfamily = "serif", hjust = 0) +
+  draw_label(bquote("shown."), x = 0.02, y = -0.2, size = 12, fontfamily = "serif", hjust = 0)
+```
+&nbsp;
+
+##### *Community Composition*
+```{r Community Composition, echo=FALSE, message=FALSE, warning=FALSE}
+species_matrix <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(EventID, UniqueID, UnitCode, Year_chr, SciName_cor, rel_percent_cover) %>%
+  group_by(EventID, UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+  pivot_wider(., names_from = "SciName_cor", values_from = "rel_percent_cover", values_fill = 0) %>%
+  ungroup() %>%
+  filter(complete.cases(.))
+
+# ADONIS
+ado <- function(park){
+  
+  set.seed(10403)
+  
+  ado_species <- species_matrix %>%
+    arrange(EventID, UniqueID, UnitCode, Year_chr) %>%
+    filter(UnitCode == park) %>%
+    select(-c(EventID, UniqueID, UnitCode, Year_chr))
+  
+  ado_env <- species_matrix %>%
+    arrange(EventID, UniqueID, UnitCode, Year_chr) %>%
+    filter(UnitCode == park) %>%
+    select(EventID, UniqueID, Year_chr) %>%
+    distinct()
+  
+  ado_mod <- adonis2(ado_species ~ Year_chr, data = ado_env)
+  
+  ado_pairwise <- pairwiseAdonis::pairwise.adonis(ado_species, ado_env$Year_chr) %>%
+   filter(p.adjusted < 0.05)
+  
+  list("species" = ado_species, "env" = ado_env, "mod" = ado_mod, "pairwise" = ado_pairwise)
+}
+
+# I ran these 1 at a time because ASIS and FIIS take a long time (~45 min each)
+# ado_asis <- ado("ASIS")
+# save(ado_asis, file = "./data/derived/adonis/asis_adonis.rda")
+# ado_colo <- ado("COLO")
+# save(ado_colo, file = "./data/derived/adonis/colo_adonis.rda")
+# ado_fiis <- ado("FIIS")
+# save(ado_fiis, file = "./data/derived/adonis/fiis_adonis.rda")
+# ado_gate <- ado("GATE")
+# save(ado_gate, file = "./data/derived/adonis/gate_adonis.rda")
+# ado_gewa <- ado("GEWA")
+# save(ado_gewa, file = "./data/derived/adonis/gewa_adonis.rda")
+# ado_sahi <- ado("SAHI")
+# save(ado_sahi, file = "./data/derived/adonis/sahi_adonis.rda")
+
+# load adonis models
+adonis <- list.files(here::here("data", "derived", "adonis"), pattern = ".rda", full.names = TRUE) %>%
+  map(~get(load(.))) %>%
+  set_names(., nm = sort(unique(plot_veg_cover_usda$UnitCode)))
+
+
+# SIMPER
+# set.seed(10403)
+simper_fun <- function(park){
+  
+  simper_species <- species_matrix %>%
+    arrange(EventID, UniqueID, UnitCode, Year_chr) %>%
+    filter(UnitCode == park) %>%
+    select(-c(EventID, UniqueID, UnitCode, Year_chr))
+  
+  simper_env <- species_matrix %>%
+    filter(UnitCode == park) %>%
+    select(EventID, UniqueID, Year_chr) %>%
+    distinct()
+  
+  simper_mod <- with(simper_env, simper(simper_species, Year_chr, permutations = 999)) 
+}
+
+# I ran these 1 at a time because ASIS and FIIS take a long time
+# asis_simper <- simper_fun("ASIS")
+# save(asis_simper, file = "./data/derived/simper/asis_simper.rda")
+# colo_simper <- simper_fun("COLO")
+# save(colo_simper, file = "./data/derived/simper/colo_simper.rda")
+# fiis_simper <- simper_fun("FIIS")
+# save(fiis_simper, file = "./data/derived/simper/fiis_simper.rda")
+# gate_simper <- simper_fun("GATE")
+# save(gate_simper, file = "./data/derived/simper/gate_simper.rda")
+# gewa_simper <- simper_fun("GEWA")
+# save(gewa_simper, file = "./data/derived/simper/gewa_simper.rda")
+# sahi_simper <- simper_fun("SAHI")
+# save(sahi_simper, file = "./data/derived/simper/sahi_simper.rda")
+
+# load simper models
+simper <- list.files(here::here("data", "derived", "simper"), pattern = ".rda", full.names = TRUE) %>%
+  map(~get(load(.))) %>%
+  set_names(., nm = sort(unique(plot_veg_cover_usda$UnitCode)))
+
+
+# KRUSKAL
+# load kruskal test results
+# note: kruskal tests were run using 'park_kruskals.R'
+kruskal <- list.files(here::here("data", "derived", "kruskal"), pattern = ".rda", full.names = TRUE) %>%
+  map(~get(load(.))) %>%
+  set_names(., nm = sort(unique(plot_veg_cover_usda$UnitCode)))
+
+# get list of species with significant differences between years
+kruskal_species_fun <- function(park) {
+
+  if(park == "ASIS") {
+    year_combos <- c("2008_2014", "2008_2018", "2012_2018", "2014_2018", "2016_2018")
+  } else if(park == "COLO") {
+    year_combos <- c("2008_2010", "2008_2012", "2008_2014", "2008_2016", "2010_2012", "2010_2014", "2010_2016", "2012_2014", "2012_2016", "2014_2016")
+  } else if(park == "FIIS") {
+    year_combos <- c("2009_2011", "2009_2013", "2009_2015", "2011_2013", "2011_2017", "2013_2015", "2013_2017", "2015_2017")
+  } else if(park == "GEWA") {
+    year_combos <- c("2008_2010", "2010_2012")
+  }
+  
+  year_combo_list <- map_chr(year_combos, ~paste0("mod_p_", .x))
+  
+  kruskal %>%
+    pluck(park) %>%
+    ungroup() %>%
+    select(UnitCode, SciName_cor, year_combo_list) %>%
+    unnest() %>%
+    pivot_longer(., cols = -c("UnitCode", "SciName_cor"), names_to = "year_pair", values_to = "p_val") %>%
+    filter(p_val < 0.05) %>%
+    mutate(year_combo = paste0(str_sub(year_pair, 7, 10), " vs ", str_sub(year_pair, 12, 15)))
+}
+
+kruskal_park_species <- list("ASIS", "COLO", "FIIS", "GEWA") %>%
+  map(., ~kruskal_species_fun(.x)) %>%
+  set_names(., nm = sort(unique(c("ASIS", "COLO", "FIIS", "GEWA"))))
+```
+
+|   No significant difference in community composition was found between any of the years at GATE or SAHI (GATE: *R*2 = `r format(round(adonis$GATE$mod$R2[1], 2), nsmall = 2)`, *p* = *ns*; SAHI: *R*2 = `r format(round(adonis$SAHI$modR2[1], 2), nsmall = 2),`, *p* = *ns*). At ASIS, the permutational analysis of variance (ADONIS) found a significant difference in community composition between years (*R*2 = `r format(round(adonis$ASIS$mod$R2[1], 2), nsmall = 2)`, *p* < 0.001). An examination of the pairwise comparisons between years at ASIS found significant differences between 2008 vs. 2016, 2008 vs. 2018, 2010 vs. 2014, and 2014 vs. 2018 (Figure 9). The species with the top 5 largest changes in cover that contributed to the differences between these 4 year-pairs at ASIS are shown in Figure 9. Some notable differences include:
+- An increase in *Juncus gerardii* from `r ado_species_asis %>% filter(SciName_cor == "Juncus gerardii" & Year_chr.x == "2008") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2008 to `r ado_species_asis %>% filter(SciName_cor == "Juncus gerardii" & Year_chr.y == "2012") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2012 (Figure 9a).
+- An increase in *Pinus taeda* from `r ado_species_asis %>% filter(SciName_cor == "Pinus taeda" & Year_chr.y == "2008") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2008 to `r ado_species_asis %>% filter(SciName_cor == "Pinus taeda" & Year_chr.x == "2016") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2016 (Figure 9b).
+- An increase in *Baccharis halimifolia* from `r ado_species_asis %>% filter(SciName_cor == "Baccharis halimifolia" & Year_chr.y == "2008") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2008 to `r ado_species_asis %>% filter(SciName_cor == "Baccharis halimifolia" & Year_chr.x == "2018") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2018 (Figure 9c).
+- An increase in *Juncus gerardii* from `r ado_species_asis %>% filter(SciName_cor == "Juncus gerardii" & Year_chr.x == "2010") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2010 to `r ado_species_asis %>% filter(SciName_cor == "Juncus gerardii" & Year_chr.y == "2014") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2014 (Figure 9d).
+&nbsp;
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ado_plot <- function(park, year_combos, year_chr_lists) {
+ 
+  kruskal_species <- function(park, include_vector = NULL, threshold_val = NULL) {
+    
+    include_vector <- year_combos
+    
+    park_cover <- plot_veg_cover_usda %>% 
+      filter(UnitCode == park) %>%
+      ungroup() %>%
+      select(EventID, UniqueID, UnitCode, Year_chr, SciName_cor, rel_percent_cover) %>%
+      group_by(EventID, UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+      pivot_wider(., names_from = "SciName_cor", values_from = "rel_percent_cover", values_fill = 0) %>%
+      pivot_longer(., cols = -c("EventID", "UniqueID", "UnitCode", "Year_chr"), names_to = "SciName_cor", values_to = "rel_percent_cover") %>%
+      group_by(UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+      summarise(mean_site_cover = mean(rel_percent_cover)) %>%
+      group_by(UnitCode, Year_chr, SciName_cor) %>%
+      summarise(mean_cover = mean(mean_site_cover)) 
+    
+    years <- park_cover %>%
+      group_by(UnitCode) %>%
+      mutate(Year = as.Date(paste0(Year_chr, "-01-01")),
+             first_date = as.integer(lubridate::year(min(Year))),
+             last_date = as.integer(lubridate::year(max(Year)))) %>%
+      ungroup() %>%
+      select(first_date, last_date) %>%
+      distinct()
+    
+    year_list <- as.list(seq(years$first_date, years$last_date, by = 2)) %>% map(., ~as.character(.x))
+    
+    year_list_combos <- as.data.frame(expand.grid("col1" = year_list, "col2" = year_list))
+    
+    df_filter_fun <- function(year1, year2) {
+      park_year1 <- park_cover %>% filter(Year_chr == year1)
+      park_year2 <- park_cover %>% filter(Year_chr == year2)
+      
+      df <- full_join(park_year1, park_year2, by = "SciName_cor") %>%
+        mutate(cover_dif = mean_cover.y - mean_cover.x)# %>%
+      #filter(!is.na(cover_dif))
+      
+      if(!is.null(threshold_val)) {
+        park_year1_year2 <- df %>%
+          filter(cover_dif < threshold_val*-1 | cover_dif > threshold_val)
+      } else {
+        park_year1_year2 <- df
+      }
+      return(park_year1_year2)
+    } 
+    
+    df_names <- year_list_combos %>%
+      mutate(names = paste0(park, "_", col1, "_", col2)) %>%
+      pull(names)
+    
+    park_species_difs <- map2(
+      year_list_combos$col1, 
+      year_list_combos$col2, 
+      ~df_filter_fun(year1 = .x, year2 = .y)) %>%
+      set_names(., nm = df_names) %>%
+      bind_rows() %>%
+      #filter(cover_dif != 0) %>%
+      mutate(year_combo = paste0(Year_chr.x, " vs ", Year_chr.y))
+    
+    if(is.null(include_vector)){
+      park_species_difs <- park_species_difs
+    } else {
+      park_species_difs <- park_species_difs %>% filter(year_combo %in% include_vector)
+    }
+  }
+  
+  ado <- adonis %>% pluck(park) %>% pluck("pairwise") %>% pluck("pairs")
+  
+  kruskal_species <- kruskal_species(park, include_vector = as.list(ado)) %>%
+    group_by(year_combo) %>%
+    mutate(abs_dif = abs(cover_dif)) 
+
+  kruskal_df <- kruskal_park_species %>% pluck(park)
+  
+  signif_species <- data.frame("id" = ado) %>%
+    group_by(id) %>%
+    mutate(year1 = min(c(str_sub(id, 1, 4), str_sub(id, 9,12))),
+           year2 = max(c(str_sub(id, 1, 4), str_sub(id, 9, 12))),
+           mod_id = paste0("mod_p_", year1, "_", year2)) %>%
+    select(id, mod_id) %>%
+    right_join(kruskal_df, . , by = c("year_pair"="mod_id")) %>%
+    left_join(., kruskal_species, by = c("id"="year_combo", "SciName_cor" = "SciName_cor"))
+  
+  ado_species_list <- kruskal_df %>% #eval(sym(paste0("ado_species_", tolower(park)))) %>%
+    select(SciName_cor) %>%
+    unique() %>%
+    pull()
+
+  plot_df <- plot_veg_cover_usda %>%
+    filter(UnitCode == park) %>%
+    group_by(UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+    summarise(mean_site_cover = mean(rel_percent_cover)) %>%
+    filter(SciName_cor %in% ado_species_list) %>%
+    group_by(UnitCode, Year_chr, SciName_cor) %>%
+    summarise(mean_cover = mean(mean_site_cover),
+              se_cover = sd(mean_site_cover)/sqrt(length(mean_site_cover))) %>%
+    pivot_wider(., names_from = "SciName_cor", values_from = "mean_cover", values_fill = 0) %>%
+    pivot_longer(., cols = -c("UnitCode", "Year_chr", "se_cover"), names_to = "SciName_cor", values_to = "mean_cover") %>%
+    left_join(., kruskal_df[c("SciName_cor", "year_combo")], by = "SciName_cor") %>%
+    mutate(year1 = as.integer(str_sub(year_combo, 1, 4)),
+           year2 = as.integer(str_sub(year_combo, 9, 12)),
+           lower_year = if_else(year1 < year2, year1, year2),
+           higher_year = if_else(year2 > year1, year2, year1),
+           year_combo_group = paste0(lower_year, " vs. ", higher_year),
+           Year = as.Date(paste0(Year_chr, "-01-01")),
+           SciName_cor_lab = if_else(SciName_cor %in%c("Carex", "Salicornia", "Juncus"), paste0(SciName_cor, " spp."), SciName_cor))
+
+ # return(plot_df)
+  g <- map2(year_combos, year_chr_lists, ~plot_df %>% filter(year_combo == .x & Year_chr %in% .y))
+
+  legend_title <- paste0(park, ": species contributing to differences between years")
+
+  ggplot(plot_df, aes(x = Year, y = mean_cover, color = SciName_cor_lab, fill = SciName_cor_lab)) +
+    geom_line() +
+    map(g, ~geom_point(data = .x, aes(x = Year, y = mean_cover), size = 2, color = "black", shape = 21)) +
+    geom_text(data = . %>%
+              ungroup() %>%
+              distinct(year_combo_group) %>%
+              arrange(year_combo_group) %>%
+              mutate(letter = paste0("(",LETTERS[1:n()], ")"),
+                     f = pmap_chr(list(letter, year_combo_group), function(a, b) deparse(bquote(bold(.(a)~plain(.(b))))))),
+    aes(x = structure(-Inf, class = "Date"), y =  Inf, label = f),
+            hjust = -0.2, vjust = 2, size  = 3.5, fontface = "bold", family = "serif", parse = T, inherit.aes = F) +
+    lemon::facet_rep_wrap(~year_combo_group) +
+    {if(park == "FIIS")
+      scale_x_date(limits = c(as.Date("2009-01-01"), as.Date("2017-01-01")), breaks = seq.Date(as.Date("2009-01-01"), as.Date("2017-01-01"), by = "2 years"), date_labels = "'%y", sec.axis = dup_axis())} +
+    {if(park == "ASIS")
+      scale_x_date(limits = c(as.Date("2008-01-01"), as.Date("2018-01-01")), date_labels = "'%y", sec.axis = dup_axis())} +
+    {if(park == "COLO")
+      scale_x_date(limits = c(as.Date("2008-01-01"), as.Date("2016-01-01")), date_labels = "'%y", sec.axis = dup_axis())} +
+    {if(park == "FIIS")
+      scale_y_continuous(limits = c(0,100), name = "Average relative cover (%)", sec.axis = dup_axis())} +
+    {if(park %in% c("ASIS", "COLO"))
+      scale_y_continuous(name = "Average relative cover (%)", sec.axis = dup_axis())} +
+    guides(color = guide_legend(title = legend_title, ncol = 2), fill = guide_legend(title = legend_title, ncol = 2)) +
+    lfeheR::theme(base_size = 12) +
+    theme(
+      axis.title.y = element_text(margin = margin(r = 10, unit = "pt")),
+      text = element_text(family = "serif", size = 12),
+      legend.key = element_rect(color = "transparent"),
+      legend.text = element_text(face = "italic"),
+      legend.position = "bottom",
+      legend.title.position = "top",
+      legend.title = element_text(hjust = 0),
+      legend.margin = margin(t = 0, unit = "pt"),
+      legend.key.spacing.y = unit(0, "pt"),
+      legend.justification = 0.5,
+      panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+      panel.spacing = unit(10, "pt"),
+      strip.background = element_blank(),
+      strip.text = element_blank()
+    )
+}
+```
+
+```{r Figure 12, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=7, out.width=6.5, out.height=7}
+ado_plot("ASIS", year_combos = c("2016 vs 2018", "2018 vs 2008", "2018 vs 2012", "2018 vs 2014", "2008 vs 2014"), year_chr_lists = list(c("2016", "2018"), c("2008", "2018"), c("2012", "2018"), c("2014", "2018"), c("2008", "2014")))
+```
+&nbsp;
+
+|   At COLO, the permutational analysis of variance (ADONIS) found a significant difference in community composition between years (*R*2 = `r format(round(ado_colo$mod$R2[1], 2), nsmall = 2)`, *p* < 0.05). An examination of the pairwise comparisons between years at COLO found significant differences between 2008 vs. 2010, 2010 vs. 2012, 2010 vs. 2014, and 2010 vs. 2016 (Figure 10). The species with the top 5 largest changes in cover that contributed to the differences between these 4 year-pairs at COLO are shown in Figure 10. Some notable differences include:
+- A decrease in *Lilaeopsis chinensis* from `r ado_species_colo %>% filter(SciName_cor == "Lilaeopsis chinensis" & Year_chr.x == "2008") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2008 to `r ado_species_colo %>% filter(SciName_cor == "Lilaeopsis chinensis" & Year_chr.y == "2010") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2010 (Figure 10a).
+- A decrease in *Phragmites australis* from `r ado_species_colo %>% filter(SciName_cor == "Phragmites australis" & Year_chr.x == "2010" & Year_chr.y == "2012") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2010 to `r ado_species_colo %>% filter(SciName_cor == "Phragmites australis" & Year_chr.y == "2012") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2012 (Figure 10b).
+- A increase in *Zizaniopsis miliacea* from `r ado_species_colo %>% filter(SciName_cor == "Zizaniopsis miliacea" & Year_chr.x == "2010") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2010 to `r ado_species_colo %>% filter(SciName_cor == "Zizaniopsis miliacea" & Year_chr.y == "2014") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2014 (Figure 10c).
+- An increase in *Zizania aquatica* from `r ado_species_colo %>% filter(SciName_cor == "Zizania aquatica" & Year_chr.y == "2010") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2010 to `r ado_species_colo %>% filter(SciName_cor == "Zizania aquatica" & Year_chr.x == "2016") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2016 (Figure 10d).
+
+```{r Figure 13, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=7, out.width=6.5, out.height=7}
+ado_plot("COLO", year_combos = c("2008 vs 2010", "2010 vs 2012", "2010 vs 2014", "2016 vs 2010"), year_chr_lists = list(c("2008", "2010"), c("2010", "2012"), c("2010", "2014"), c("2010", "2016")))
+```
+&nbsp;
+
+|   At FIIS, the permutational analysis of variance (ADONIS) found a significant difference in community composition between years (*R*2 = `r format(round(ado_fiis$mod$R2[1], 2), nsmall = 2)`, *p* < 0.001). An examination of the pairwise comparisons between years at FIIS found significant differences between 2011 vs. 2017 and 2015 vs. 2017 (Figure 11). The species with the top 5 largest changes in cover that contributed to the differences between these 2 year-pairs at FIIS are shown in Figure 11. Some notable differences include:
+- A decrease in *Juncus spp.* from `r ado_species_fiis %>% filter(SciName_cor == "Juncus" & Year_chr.y == "2011") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2011 to `r ado_species_fiis %>% filter(SciName_cor == "Juncus" & Year_chr.x == "2017") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2017 (Figure 11a).
+- An increase in *Teucrium canadense* from `r ado_species_fiis %>% filter(SciName_cor == "Teucrium canadense" & Year_chr.y == "2011") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2011 to `r ado_species_fiis %>% filter(SciName_cor == "Teucrium canadense" & Year_chr.x == "2017") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2017 (Figure 11a).
+- An increase in *Juncus canadensis* from `r ado_species_fiis %>% filter(SciName_cor == "Juncus canadensis" & Year_chr.y == "2015") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2015 to `r ado_species_fiis %>% filter(SciName_cor == "Juncus canadensis" & Year_chr.x == "2017") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2017 (Figure 11b).
+- An increase in *Mikania scandens* from `r ado_species_fiis %>% filter(SciName_cor == "Mikania scandens" & Year_chr.y == "2015") %>% mutate(mean_cover = round(mean_cover.y,0)) %>% pull(mean_cover)`% in 2015 to `r ado_species_fiis %>% filter(SciName_cor == "Mikania scandens" & Year_chr.x == "2017") %>% mutate(mean_cover = round(mean_cover.x,0)) %>% pull(mean_cover)`% in 2017 (Figure 11b).
+
+```{r Figure 14, echo=FALSE, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=5, out.width=6.5, out.height=5}
+ado_plot("FIIS", year_combos = c("2017 vs 2011", "2017 vs 2015"), year_chr_lists = list(c("2017", "2011"), c("2017", "2015")))
+```
+&nbsp;
+
+```{r Turnover, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+#turnover
+turnover_fun <- function(park) {
+  turn_df <- plot_veg_cover_usda %>%
+    filter(UnitCode == park) %>%
+    group_by(UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+    summarise(mean_site_cover = mean(rel_percent_cover, na.rm = TRUE)) %>%
+    ungroup() %>%
+    mutate(year = as.Date(paste0(Year_chr, "-01-01")),
+           first_year = first(year),
+           years_num = as.numeric(year - first_year)/365.25,
+           id = as.factor(UniqueID),
+           species = as.factor(SciName_cor)) %>%
+    ungroup() %>%
+    select(-c(UniqueID, year, first_year, SciName_cor))
+  
+  years_df <- turn_df %>%
+    ungroup() %>%
+    select(Year_chr, years_num) %>%
+    distinct()
+  
+  total_turn <- codyn::turnover(turn_df, time.var = "years_num", species.var = "species", abundance.var = "mean_site_cover", replicate.var = "id", metric = "total") %>%
+    mutate(UnitCode = park) %>%
+    left_join(., years_df, by = c("years_num")) %>%
+    group_by(UnitCode, Year_chr) %>%
+    summarise(mean_turn = mean(total, na.rm = TRUE),
+              se_turn = sd(total)/sqrt(length(total)),
+              type = "total")
+  
+  appear <- codyn::turnover(turn_df, time.var = "years_num", species.var = "species", abundance.var = "mean_site_cover", replicate.var = "id", metric = "appearance") %>%
+    mutate(UnitCode = park) %>%
+    left_join(., years_df, by = c("years_num")) %>%
+    group_by(UnitCode, Year_chr) %>%
+    summarise(mean_turn = mean(appearance, na.rm = TRUE),
+              se_turn = sd(appearance)/sqrt(length(appearance)),
+              type = "appear")
+  
+  disappear <- codyn::turnover(turn_df, time.var = "years_num", species.var = "species", abundance.var = "mean_site_cover", replicate.var = "id", metric = "disappearance") %>%
+    mutate(UnitCode = park) %>%
+    left_join(., years_df, by = c("years_num")) %>%
+    group_by(UnitCode, Year_chr) %>%
+    summarise(mean_turn = mean(disappearance, na.rm = TRUE),
+              se_turn = sd(disappearance)/sqrt(length(disappearance)),
+              type = "disappear")
+  
+  turn <- bind_rows(total_turn, appear, disappear) %>%
+    mutate(Year = as.Date(paste0(Year_chr, "-01-01")))
+}
+
+turnover_df <- map(list("ASIS", "COLO", "FIIS", "GATE", "GEWA", "SAHI"), ~turnover_fun(.x)) %>%
+  bind_rows() %>%
+  mutate(type_lab = case_when(
+    type == "appear" ~ "appearances   ",
+    type == "disappear" ~ "disappearances   ",
+    type == "total" ~ "total turnover   "
+  ))
+
+ggplot(turnover_df, aes(x = Year, y = mean_turn, color = type_lab)) +
+  geom_line() +
+  geom_point(aes(fill = type_lab), shape = 21, color = "black", size = 2) + 
+  geom_text(data = . %>% 
+              ungroup() %>% 
+              distinct(UnitCode) %>%
+              mutate(letter = paste0("(",LETTERS[1:n()], ")"),
+                     f = pmap_chr(list(letter, UnitCode), function(a, b) deparse(bquote(bold(.(a)~plain(.(b))))))),
+    aes(x = structure(-Inf, class = "Date"), y =  Inf, label = f),
+            hjust = -0.2, vjust = 2, size  = 3.5, fontface = "bold", family = "serif", parse = T, inherit.aes = F) +
+  lemon::facet_rep_wrap(~UnitCode) +
+  scale_x_date(limits = c(as.Date("2008-01-01"), as.Date("2018-01-01")), date_labels = "'%y", breaks = seq.Date(as.Date("2008-01-01"), as.Date("2018-01-01"), by = "2 years"), sec.axis = dup_axis()) +
+  scale_y_continuous(limits = c(0,0.9), breaks = seq(0,0.8, by = 0.2), sec.axis = dup_axis(), name = "Species turnover") +
+  lfeheR::theme(base_size = 12) +
+    theme(
+      axis.title.y = element_text(margin = margin(r = 10, unit = "pt")),
+      text = element_text(family = "serif", size = 12),
+      legend.key = element_rect(color = "transparent"),
+      legend.position = "bottom",
+      legend.title = element_blank(),
+      legend.margin = margin(t = -10, unit = "pt"),
+      panel.grid.major = element_line(color = "grey", linewidth = 0.5, linetype = "dashed"),
+      panel.spacing = unit(10, "pt"),
+      strip.background = element_blank(),
+      strip.text = element_blank()
+    )
+```
+
+##### **Discussion**
+###### *Park-level Trends**
+|   The salt marsh plant community at ASIS has seen a reduction in total plot-level species richness (Figure 3a), total park-level species richness (Figure 4a), and count and cover of low salinity tolerant species (Figure 6a and 6c). The changes in this community are most likely a consequence of both climate change, land-use change, and sea-level rise. More specifically, increases in evapotranspiration due to above average air temperatures and or below average precipitation resulting from climate change have led to elevated salinities within the shallow coastal waters surrounding the marshes. Similarly, below average precipitation has also likely the decreased flow of tributaries to the coastal bays, which also contributes to elevated salinities. Finally, sea-level rise is likely decreasing the elevation of the marshes and pushing salt water farther inland into marsh areas that were not previously inundated with salt water, such that some less salt tolerant species are disappearing. Additionally, the stability in the frequency of occurrence (Figure 6b) of species within all salinity tolerance categories would suggest that either (a) the total area of all marsh habitats is decreasing (i.e., converting to open water), or that (b) more salt-tolerant species may be migrating up slope at the expense of less salt-tolerant species (see increase in cover of medium salinity tolerance species in Figure 6c). 
+
+###### *Status of the NCBN Salt Marsh Vegetation Monitoring Protocol*
+The National Park Service Inventory and Monitoring (I&M) Program's Northeast Coastal and Barrier Network (NCBN) has identified salt marsh condition, in addition to several associated vital signs, as high priority for long-term monitoring. The first iteration of the salt marsh vegetation monitoring protocol was originally developed by the USGS and University of Rhode Island for the purpose of comparing the vegetation community in hydrologically altered marshes to more pristine 'control' marshes in order to understand the potential effects of hydrologic restoration on salt marsh habitats within Cape Cod National Seashore (Roman et al., 2001). This protocol was then adapted to measure change in the species composition and abundance of the salt marsh plant community at the other six coastal parks monitored by NCBN in response to a multitude of stressors such as hydrologic alteration, storms, visitor use, nutrient loading, watershed development, sea-level rise and climate change, among others (Rocks and Stevens 2018). The salt marsh vegetation monitoring protocol was successfully implemented across seven NCBN parks over a period of 10 years from 2008 to 2018, but was placed on hold in 2018 due to staffing and budget shortages. During the years that this protocol was in use, it was by far the most labor- and time-intensive vital sign monitored by NCBN. For instance, assuming a four person crew (two full-time biologists and two interns) was used for each sampling event, a conservation estimate of 7,072 total man-hours were dedicated to field data collection alone during this time (i.e., 221 sampling events *x* 8 hours per day *x* 4 crew members). Further more, this estimate does not include the additional time needed for traveling to and from the NCBN main office (Kingston, Rhode Island) to each park, logistical considerations (e.g., time for budget and travel planning, equipment preparation, clean-up, etc.), or data management and annual reporting tasks, among others. For a more specific example, it took a total of 13 full days to complete field sampling at just ASIS in 2018. Similarly, this protocol was also one of the more budget intensive monitoring programs conducted by NCBN. In 2018, Rocks and Stevens (2018) estimated that the annual operational cost associated with the NCBN salt marsh vegetation monitoring was $50,000 per year - a figure that would likely be much higher today.
+
+- The data summaries that were suggested for annual reporting in the protocol implementation plan (Rocks and Stevens 2018) include species composition (species lists), percent cover for all cover types by site, and presence of any federal, state-listed and/or non-native species. Additionally, the protocol implementation plan also recommends that trend analysis be conducted on a 3-5 year basis and suggests the use of non-parametric multivariate community analysis methods such as analysis of similarities (ANOSIM) and similarity of percentages analysis (SIMPER) in order to understand change over time. While the suggestions for reporting are definitely important to include in order to have a record of the full suite of species at each park, the recommended trend analysis do not actually calculate trends and only indicate where differences between plant communities have occurred in the previous sample years.    
+For example, the adonis analysis for FIIS suggests that there is a significant difference in community composition between year pairs. Subsequent pairwise contrasts found that the specific significant differences were between the years 2011 vs. 2017 and 2015 vs. 2017. As such, these methods of analysis have limited value for understanding the broader 'big-picture' changes in these salt marsh plant communities and also do not provide a means for anticipating (i.e., predicting) future changes and developing management actions that may be needed to either counteract or facilitate these changes.
+
+
+###### *Opportunities for Future Salt Marsh Vegetation Monitoring at NCBN Parks*
+-May not be feasible to identify specific species, especially in areas with higher diversity (brackish marshes like COLO), areas with lots of overlapping layers, or areas with several species that are virtually indistinguishable in even high resolution imagery (e.g., spartina patens vs. distichlis). However, it may be feasible to classify marshes into relatively broad categories such as low marsh vs. high marsh or to pick out a few species that are easily distinguished from surrounding vegetation e.g. S. alterniflora vs. mixed Distichlis/S. patens (Mason Harris et al., 2024). In fact, monitoring a subset of ecologically important species/cover groups is likely to be just as (if not more) informative for understanding changes in marsh condition as compared to measuring the cover of every single species in every plot because even the most pristine North American salt marshes are known to have very low plant diversity. Similarly, the use of broad cover categories (as opposed to % cover of every unique species) may provide information that is more easily interpreted and thus more readily actionable by park resource managers. 
+
+
+- We could combine other remotely-sensed metrics of marsh health with the cover classifications to obtain a comprehensive picture of marsh health because marsh health can be reflected in many different aspects of the structure and function of the plant community. For example, results obtained from the current ground-survey method indicate that species richness and diversity has remained stable over time, thus giving the impression that the marsh is also maintaining a 'stable' condition. However, when this data is combined with other remotely-derived metrics of marsh health, such as, it may be apparent that the productivity or biomass of the marsh is actually decreasing over time, indicating a decline in condition that would not otherwise be apparent from the % cover data along. Similarly, remotely-derived metrics of marsh health may not be easily measured by on the ground surveys. For example, it is much less labor intensive, and also less damaging to the marsh, to estimate changes in biomass from remotely-sensed imagery as compared to the destructive harvesting that is necessarily for the traditional clip-plot method. Thus, remotely-sensed data may also provide information that is more ecologically relevant while also being much less labor/cost intensive.
+
+##### **Literature Cited**
+
+Lichvar, R.W., D.L. Banks, W.N. Kirchner, and N.C. Melvin. 2016. The National Wetland Plant List: 2016 wetland ratings. Phytoneuron 2016-30: 1-17. (See also the official website of the National Wetland Plant List.)
+
+Mason Harris, J., W.P. Broussard III, and J.A. Nelson. 2024. Evaluating coastal wetland restoration using drones and high-resolution imagery. Estuaries and Coasts 47:1359-1375. doi.org/10.1007/s12237-024-01376-1.
+
+Nicosia, E.L., and P.S. Pooler. 2012a. Monitoring salt marsh vegetation and nekton at Fire Island National Seashore: 2011 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2012/397. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L., and P.S. Pooler. 2012b. Monitoring salt marsh vegetation and nekton at William Floyd Estate, Fire Island National Seashore: 2011 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2012/399. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L., and P.S. Pooler. 2012c. Monitoring salt marsh vegetation and nekton at Sagamore Hill National Historic Site: 2011 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2012/398. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2013a. Monitoring salt marsh vegetation and nekton at Assateague Island National Seashore: 2012 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2013/655. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2013b. Monitoring salt marsh vegetation at Colonial National Historical Park: 2012 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2013/444. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2013c. Monitoring salt marsh vegetation and nekton at Gateway National Recreation Area’s Sandy Hook Unit: 2012 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2013/458. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2013d. Monitoring salt marsh vegetation at George Washington Birthplace National Monument: 2012 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2013/442. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2015a. Monitoring salt marsh vegetation at Colonial National Historical Park: 2014 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2015/791. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2015b. Monitoring salt marsh vegetation and nekton at Fire Island National Seashore and the William Floyd Estate: 2015 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2015/995. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2015c. Monitoring salt marsh vegetation at Gateway National Recreation Area’s Sandy Hook Unit: 2014 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2015/793. National Park Service, Fort Collins, Colorado.
+
+Nicosia, E.L. 2015d. Monitoring salt marsh vegetation and nekton at Sagamore Hill National Historic Site: 2015 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2015/996. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2010a. Salt marsh vegetation and nekton community monitoring at Assateague Island National Seashore: 2008 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/065. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2010b. Salt marsh vegetation monitoring at Colonial National Historical Park: 2008 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/066. National Park Service, Fort Collins, Colorado. 
+
+Patenaude, E.L., and P.S. Pooler. 2010c. Monitoring salt marsh vegetation at Colonial National Historical Park: 2010 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/120. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2010d. Salt marsh vegetation and nekton community monitoring at William Floyd Estate, Fire Island National Seashore. Natural Resource Technical Report NPS/NCBN/NRDS—2010/070. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2010e. Salt marsh vegetation and nekton community monitoring at Fire Island National Seashore: 2009 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/068. National Park Service, Fort Collins, Colorado. 
+
+Patenaude, E.L., and P.S. Pooler. 2010f. Salt marsh vegetation and nekton community monitoring at William Floyd Estate, Fire Island National Seashore: 2009 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/070. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2010g. Salt marsh vegetation and nekton community monitoring at George Washington Birthplace National Monument: 2008 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/069. National Park Service, Fort Collins, Colorado. 
+
+Patenaude, E.L., and P.S. Pooler. 2010h. Salt marsh vegetation and nekton community monitoring at Sagamore Hill National Historical Site: 2009 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2010/067. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2011a. Monitoring salt marsh vegetation and nekton at Assateague Island National Seashore: 2010 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2011/312. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2011b. Monitoring salt marsh vegetation and nekton at Gateway National Recreation Area’s Sandy Hook Unit: 2010 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2011/132. National Park Service, Fort Collins, Colorado.
+
+Patenaude, E.L., and P.S. Pooler. 2011c. Salt marsh vegetation and nekton community monitoring at George Washington Birthplace National Monument: 2010 summary report. Natural Resource Data Series NPS/NCBN/NRDS—2011/133. National Park Service, Fort Collins, Colorado.
+
+Rocks, E.N., and S.M. Stevens. 2018. Northeast Coastal and Barrier Network salt marsh vegetation monitoring protocol implementation plan: Version 1.0. Natural Resource Report NPS/NCBN/NRR—2018/1790. National Park Service, Fort Collins, Colorado.
+
+Roman, C.T., M.J. James-Pirri, and J.F. Heltshe. 2001. Monitoring Salt Marsh Vegetation: A Protocol for the Long-term Coastal Ecosystem Monitoring Program at Cape Cod National Seashore. Coordinated by the USGS Patuxent Wildlife Research Center, Coastal Research Field Station at the University of Rhode Island, Narragansett, RI 02882. Available at https://irma.nps.gov/DataStore/Reference/Profile/563500.
+
+Smith, S.M. 2015. Salt marsh vegetation monitoring report, Cape Cod National Seashore: A summary of monitoring data from 2003, 2008, and 2013. Natural Resource Report NPS/CACO/NRR-2015/920. National Park Service, Fort Collins, Colorado.
+
+State of New York. 2022. [New York Laws, Environmental Conservation § 9-170](https://law.justia.com/codes/new-york/2022/env/article-9/title-17/9-1709/). New York Department of State. 2021. [6 New York Codes, Rules and Regulations Part 575: Prohibited and Regulated Invasive Species](https://govt.westlaw.com/nycrr/Browse/Home/NewYork/NewYorkCodesRulesandRegulations?guid=Ie8d3e7b0339611e4baa20000845b8d3e&originationContext=documenttoc&transitionType=Default&contextData=(sc.Default)).
+
+U.S. Army Corps of Engineers. 2009. Regional supplement to the Corps of Engineers Wetland Delineation Manual: Northcentral and Northeast Region. U.S. Army Corps of Engineers, Engineer Research and Development Center, Environmental Laboratory ERDC/EL TR-09-19.
+&nbsp;
+
+```{r Appendix 1, echo=FALSE, message=FALSE, warning=FALSE}
+cover <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(EventID, UniqueID, UnitCode, Year_chr, SciName_cor, rel_percent_cover) %>%
+  pivot_wider(names_from = SciName_cor, values_from = rel_percent_cover, values_fill = 0) %>%
+  pivot_longer(., cols = -c(EventID, UniqueID, UnitCode, Year_chr), names_to = "SciName_cor", values_to = "rel_percent_cover") %>%
+  group_by(UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+  summarise(mean_cover = mean(rel_percent_cover, na.rm = TRUE)) %>%
+  group_by(UnitCode, SciName_cor) %>%
+  summarise(mean_cover = mean(mean_cover, na.rm = TRUE)) 
+
+frq <- site_veg_frq_usda %>%
+  ungroup() %>%
+  select(UniqueID, UnitCode, Year_chr, SciName_cor, frq) %>%
+  pivot_wider(names_from = SciName_cor, values_from = frq, values_fill = 0) %>%
+  pivot_longer(., cols = -c(UniqueID, UnitCode, Year_chr), names_to = "SciName_cor", values_to = "frq") %>%
+  group_by(UnitCode, SciName_cor) %>%
+  summarise(mean_frq = mean(frq, na.rm = TRUE))
+
+imp <- plot_veg_cover_usda %>%
+  ungroup() %>%
+  select(EventID, UniqueID, UnitCode, Year_chr, SciName_cor, rel_percent_cover) %>%
+  pivot_wider(names_from = SciName_cor, values_from = rel_percent_cover, values_fill = 0) %>%
+  pivot_longer(., cols = -c(EventID, UniqueID, UnitCode, Year_chr), names_to = "SciName_cor", values_to = "rel_percent_cover") %>%
+  group_by(UniqueID, UnitCode, Year_chr, SciName_cor) %>%
+  summarise(mean_cover = mean(rel_percent_cover, na.rm = TRUE)) %>%
+  left_join(., site_veg_frq_usda %>%
+              ungroup() %>%
+              select(UniqueID, UnitCode, Year_chr, SciName_cor, frq), 
+            by = c("UniqueID", "UnitCode", "Year_chr", "SciName_cor")) %>%
+  ungroup() %>%
+  mutate(imp = (((mean_cover/100) + frq)/2)*10) %>%
+  filter(!is.na(imp)) %>%
+  group_by(UnitCode, SciName_cor) %>%
+  summarise(mean_imp = mean(imp, na.rm = TRUE))
+
+top5cover <- cover %>% 
+  group_by(UnitCode) %>%
+  slice_max(order_by = mean_cover, n = 5) %>%
+  left_join(., plot_veg_cover_usda %>% ungroup() %>% select(-c(EventID, UniqueID, SciName_obs, SubunitCode, Year_chr, Date, PercentCover, rel_percent_cover, total_percent_cover)) %>% distinct(), by = c("UnitCode", "SciName_cor")) %>%
+  mutate(annual = if_else(Duration == "Annual", "A", ""),
+         graminoid = if_else(GrowthHabit == "Graminoid", "G", ""),
+         wetland_status = if_else(is.na(wetland_status), "", wetland_status),
+         obl = if_else(wetland_status == "OBL", "O", ""),
+         inv = ifelse(if_any(starts_with = "invasive", .fns = ~ . %in% TRUE), "I", ""),
+         characteristics_cover = paste0(annual, graminoid, obl, inv)) %>%
+  ungroup() %>%
+  select(UnitCode, mean_cover, "sciname_cover" = SciName_cor, characteristics_cover) %>%
+  mutate(sciname_cover = if_else(sciname_cover %in% c("Salicornia", "Suaeda"), paste0(sciname_cover, " spp."), sciname_cover))
+
+top5frq <- frq %>%
+  group_by(UnitCode) %>%
+  slice_max(order_by = mean_frq, n = 5) %>%
+  left_join(., plot_veg_cover_usda %>% ungroup() %>% select(-c(EventID, UniqueID, SciName_obs, SubunitCode, Year_chr, Date, PercentCover, rel_percent_cover, total_percent_cover)) %>% distinct(), by = c("UnitCode", "SciName_cor")) %>%
+  mutate(annual = if_else(Duration == "Annual", "A", ""),
+         graminoid = if_else(GrowthHabit == "Graminoid", "G", ""),
+         wetland_status = if_else(is.na(wetland_status), "", wetland_status),
+         obl = if_else(wetland_status == "OBL", "O", ""),
+         inv = ifelse(if_any(starts_with = "invasive", .fns = ~ . %in% TRUE), "I", ""),
+         characteristics_frq = paste0(annual, graminoid, obl, inv)) %>%
+  ungroup() %>%
+  select(mean_frq, "sciname_frq" = SciName_cor, characteristics_frq)  %>%
+  mutate(sciname_frq = if_else(sciname_frq %in% c("Salicornia", "Suaeda"), paste0(sciname_frq, " spp."), sciname_frq))
+
+top5imp <- imp %>%
+  group_by(UnitCode) %>%
+  slice_max(order_by = mean_imp, n = 5, with_ties = FALSE) %>%
+  left_join(., plot_veg_cover_usda %>% ungroup() %>% select(-c(EventID, UniqueID, SciName_obs, SubunitCode, Year_chr, Date, PercentCover, rel_percent_cover, total_percent_cover)) %>% distinct(), by = c("UnitCode", "SciName_cor")) %>%
+  mutate(annual = if_else(Duration == "Annual", "A", ""),
+         graminoid = if_else(GrowthHabit == "Graminoid", "G", ""),
+         wetland_status = if_else(is.na(wetland_status), "", wetland_status),
+         obl = if_else(wetland_status == "OBL", "O", ""),
+         inv = ifelse(if_any(starts_with = "invasive", .fns = ~ . %in% TRUE), "I", ""),
+         characteristics_imp = paste0(annual, graminoid, obl, inv)) %>%
+  ungroup() %>%
+  select(mean_imp, "sciname_imp" = SciName_cor, characteristics_imp) %>%
+  mutate(sciname_imp = if_else(sciname_imp %in% c("Salicornia", "Suaeda"), paste0(sciname_imp, " spp."), sciname_imp))
+
+top5species <- bind_cols(top5cover, top5frq, top5imp)
+
+flextable(data = top5species, col_keys = c("UnitCode", "dummy_cover", "mean_cover", "dummy_frq", "mean_frq", "dummy_imp", "mean_imp")) %>%
+  align(., align = "center", part = "all") %>%
+  add_header_lines(., values = c("Appendix 1. Salt marsh plant cover species with the top 5 highest relative mean cover, frequency, and importance value in each park unit. A = annual species, all others are biennial or perennial; G = graminoid species; O = obligate wetland species, all others occur at least some of the time in upland conditions.")) %>%
+  mk_par(j = "dummy_cover", value = as_paragraph(as_i(sciname_cover), as_chunk(" "), characteristics_cover)) %>%
+  mk_par(j = "dummy_frq", value = as_paragraph(as_i(sciname_frq), as_chunk(" "), characteristics_frq)) %>%
+  mk_par(j = "dummy_imp", value = as_paragraph(as_i(sciname_imp), as_chunk(" "), characteristics_imp)) %>%
+  colformat_double(., j = 3, digits = 1) %>%
+  colformat_double(., j = c(5,7), digits = 2) %>%
+  set_header_labels(., UnitCode = "Park Unit", dummy_cover = "Species", mean_cover = "Cover (%)", dummy_frq = "Species", mean_frq = "Frequency", dummy_imp = "Species", mean_imp = "Importance Value") %>%
+  align(., i = 1, align = "left", part = "header") %>%
+  hline(., i = c(5,10,15,20,25), border = fp_border(color = "black", width = 1)) %>%
+  merge_v(., j = 1) %>%
+  fix_border_issues() %>%
+  padding(., part = "body", padding.top = 3, padding.bottom = 3) %>%
+  autofit() %>%
+  fit_to_width(max_width = 6.5)
+```
+&nbsp;
+
+```{r Appendix 2: Species lists for each park, message=FALSE, warning=FALSE, include=FALSE}
+species_list_table_fun <- function(park_code, letter, park) {
+  plot_veg_cover_usda %>%
+    mutate(SciName_cor = if_else(SciName_cor %in% c("Aster", "Bassia", "Bromus", "Carex", "Cuscuta", "Cyperus", "Digitaria", "Eleocharis", "Eragrostis", "Galium", "Ipomoea", "Hibiscus", "Hydrocotyle", "Juncus", "Leersia", "Lepidium", "Lonicera", "Lycopus", "Melilotus", "Panicum", "Polygonum", "Rosa", "Rubus", "Rumex", "Salicornia", "Scirpus", "Solidago", "Suaeda", "Typha", "Vitis"), paste0(SciName_cor, " spp."), SciName_cor)) %>%
+    ungroup() %>%
+    select(UnitCode, SciName_cor) %>%
+    group_by(UnitCode) %>%
+    distinct(SciName_cor) %>%
+    ungroup() %>%
+    filter(UnitCode == park_code) %>%
+    select(SciName_cor) %>%
+    arrange(SciName_cor) %>%
+    left_join(., plot_veg_cover_usda %>% ungroup() %>% select(SciName_cor, CommonName, AcceptedSymbol) %>% distinct(SciName_cor, CommonName, AcceptedSymbol), by = "SciName_cor") %>%
+    flextable(.) %>%
+    align(., align = "center", part = "all") %>%
+    set_table_properties(., layout = "autofit") %>%
+    add_header_lines(., values = c(paste0("Appendix 2", letter, ". Salt marsh plant species list for ", park, ". Species labeled with .spp could not be identified beyond the genus level. Common names and symbols are derived from the USDA Plants database (plants.usda.gov)."))) %>%
+    set_header_labels(., SciName_cor = "Species", CommonName = "Common Name", AcceptedSymbol = "Symbol") %>%
+    align(., i = 1, align = "left", part = "header") %>%
+    border_inner_h(., border = fp_border(color = "transparent"), part = "body") %>%
+    style(j = 1, pr_t = fp_text_default(italic = TRUE)) 
+}
+```
+
+```{r Appendix 2A: Species lists for ASIS, echo=FALSE, message=FALSE, warning=FALSE}
+species_list_table_fun(park_code = "ASIS", letter = "A", park = "Assateague Island National Seashore")
+```
+&nbsp;
+
+```{r Appendix 2B: Species lists for COLO, echo=FALSE, message=FALSE, warning=FALSE}
+species_list_table_fun(park_code = "COLO", letter = "B", park = "Colonial National Historical Park")
+```
+&nbsp;
+
+```{r Appendix 2C: Species lists for FIIS, echo=FALSE, message=FALSE, warning=FALSE}
+species_list_table_fun(park_code = "FIIS", letter = "C", park = "Fire Island National Seashore")
+```
+&nbsp;
+
+```{r Appendix 2D: Species lists for GATE, echo=FALSE, message=FALSE, warning=FALSE}
+species_list_table_fun(park_code = "GATE", letter = "D", park = "Gateway National Recreation Area")
+```
+&nbsp;
+
+```{r Appendix 2E: Species lists for GEWA, echo=FALSE, message=FALSE, warning=FALSE}
+species_list_table_fun(park_code = "GEWA", letter = "E", park = "George Washington Birthplace National Monument")
+```
+&nbsp;
+
+```{r Appendix 2F: Species lists for SAHI, echo=FALSE, message=FALSE, warning=FALSE}
+species_list_table_fun(park_code = "SAHI", letter = "F", park = "Sagamore Hill National Historic Site")
+```

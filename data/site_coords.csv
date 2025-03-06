@@ -1,0 +1,48 @@
+"","SiteID","x_coord","y_coord","SiteCode","SiteName","Description","UnitCode","SubunitCode","Notes","UniqueID","CreatedDate","CreatedByContactID","LastModifiedDate","LastModifiedByContactID"
+"1",228,406673.712527941,4656951.26604401,"EHL","East Harbor Lagoon","East Harbor nekton","CACO",NA,NA,"CACO_EHL",NA,NA,NA,NA
+"2",229,411345.21978022,4642337.52747253,"GUT","Gut","Gut","CACO",NA,NA,"CACO_GUT",NA,NA,NA,NA
+"3",230,397935.489390364,4657901.29443796,"HHR","Hatches Harbor Restricted","HHR nekton","CACO",NA,NA,"CACO_HHR",NA,NA,NA,NA
+"4",231,398001.93864736,4657786.9221151,"HHR22","Hatches Harbor","Hatches Veg Plot","CACO",NA,NA,"CACO_HHR22",NA,NA,NA,NA
+"5",232,397942.356015671,4657458.95646045,"HHUR","Hatches Harbor Unrestricted","HHUR nekton","CACO",NA,NA,"CACO_HHUR",NA,NA,NA,NA
+"6",233,412090.818323095,4643288.62820223,"HR","Herring River","Herring River","CACO",NA,NA,"CACO_HR",NA,NA,NA,NA
+"7",234,411329.375,4639418.33333333,"JM","Jeremy Marsh","Jeremy Marsh","CACO",NA,NA,"CACO_JM",NA,NA,NA,NA
+"8",235,411433.547667033,4640456.57723577,"MM","Middle Meadow","Middle Meadow","CACO",NA,NA,"CACO_MM",NA,NA,NA,NA
+"9",236,407562.736097866,4656176.67291257,"MP","Moon Pond","Moon Pond","CACO",NA,NA,"CACO_MP",NA,NA,NA,NA
+"10",237,421004.539215686,4629900.34313725,"NI","Nauset Island","Nauset Island","CACO",NA,NA,"CACO_NI",NA,NA,NA,NA
+"11",238,421012.519918259,4630280.07999546,"NM","Nauset Marsh","Nauset Marsh","CACO",NA,NA,"CACO_NM",NA,NA,NA,NA
+"12",239,422151.102803738,4623737.28037383,"PB","Pleasant Bay","Pleasant Bay","CACO",NA,NA,"CACO_PB",NA,NA,NA,NA
+"13",240,400394.12571988,4654335.95280869,"WE","West End","West End Marsh","CACO",NA,NA,"CACO_WE",NA,NA,NA,NA
+"14",276,481262.310513447,4215953.76772616,"A10","Assateague 10","Salt Marsh","ASIS","ASIS","29.2 km mark, GREEN RUN, drive through dunes and bear right.  Follow road to gate on left.  Go thru gate and follow road, continue on past sharp right turn (where you park for Marsh 8) and end at old house.","ASIS_A10",NA,NA,NA,NA
+"15",277,483591.057934509,4222541.10579345,"A11","Assateague 11","Salt Marsh","ASIS","ASIS","Must canoe to this site via PINE TREE at km marker 21.5.  Follow dune crossing, bear ritght at hiker's sign, end at parking area.  Put canoe in on right (looks like there may have been a dock here at some point).","ASIS_A11",NA,NA,NA,NA
+"16",278,480113.354666667,4213305.48,"A2","Assateague 2","Salt Marsh","ASIS","ASIS","30.7 km mark. Park on beach. Follow hunting trail to left past exclosures (one on right and one on left)","ASIS_A2",NA,NA,NA,NA
+"17",279,484666.238329238,4225888.91646192,"A3","Assateague 3","Salt Marsh","ASIS","ASIS","Tingles Island betweek km markers 17 and 18.  Follow dune crossing to camp site.  Marsh 3 is directly to the left (north) and shaped like a mitten.  Very wet to access, walk towards shrub islands and out.","ASIS_A3",NA,NA,NA,NA
+"18",280,484205.281553398,4224461.84466019,"A4","Assateague 4","Salt Marsh","ASIS","ASIS","18.9 km mark.  Follow road to Hungerford house.  Follow hunting trail across large, shallow, wide creek.  Pony exclosure on site.","ASIS_A4",NA,NA,NA,NA
+"19",281,479094.054263566,4211247.54263566,"A5","Assateague 5","Salt Marsh","ASIS","ASIS","32.5 km mark, follow dune crossing to left, pull up near Pope Bay sign.","ASIS_A5",NA,NA,NA,NA
+"20",282,483410.853300733,4221577.63325183,"A6","Assateague 6","Salt Marsh","ASIS","ASIS","21.5 km mark, PINE TREE,  Follow dune crossing, bear right at hiker's sign, follow rd all the way to end and park.  This is also where canoe is launched for Marsh 11","ASIS_A6",NA,NA,NA,NA
+"21",283,480639.014705882,4215619.99754902,"A8","Assateague 8","Salt Marsh","ASIS","ASIS","29.2 km mark, GREEN RUN, drive through dunes and bear right.  Follow road to gate on left. Go through gate and follow rd.  At sharp right turn, park and follow hunter's trail to Marsh 8","ASIS_A8",NA,NA,NA,NA
+"22",284,483992.185990338,4223705.92512077,"A9","Assateague 9","Salt Marsh","ASIS","ASIS","18.9 km mark.  Follow road to Hungerford house.  This is the same access point as for Marsh 4.  To get to Marsh 9 follow the hunting trail to the left (as you are looking at the wide, shallow, creek).  Marsh 4 will be on your right.","ASIS_A9",NA,NA,NA,NA
+"23",288,627130.142857143,4527159.42857143,"TN","Tingles","Salt Marsh","ASIS","ASIS",NA,"ASIS_TN",NA,NA,NA,NA
+"24",289,344653.76,4117756.89,"C1","Colonial 1.2","Salt Marsh 1.2","COLO","COLO",NA,"COLO_C1",NA,NA,NA,NA
+"25",290,342182.220051333,4120352.88617333,"C13","Colonial 13","Tidal Brackish Marsh","COLO","COLO",NA,"COLO_C13",NA,NA,NA,NA
+"26",291,343802.395574126,4119118.10816783,"C19","Colonial 19","Tidal Brackish Marsh","COLO","COLO",NA,"COLO_C19",NA,NA,NA,NA
+"27",292,342553.114680795,4121851.98196689,"C23","Colonial 23","Tidal Brackish Marsh","COLO","COLO",NA,"COLO_C23",NA,NA,NA,NA
+"28",293,343242.919287333,4120374.92236,"C30","Colonial 30","Tidal Brackish Marsh","COLO","COLO",NA,"COLO_C30",NA,NA,NA,NA
+"29",294,345448.972975494,4118457.89313439,"C5","Colonial 5","Salt Marsh 5","COLO","COLO",NA,"COLO_C5",NA,NA,NA,NA
+"30",295,348800.759259259,4121417.64814815,"C6","Colonial 6","Salt Marsh 6","COLO","COLO",NA,"COLO_C6",NA,NA,NA,NA
+"31",296,343553.833333333,4119893.00980392,"C8","Colonial 8.2","Salt Marsh 8.2","COLO","COLO",NA,"COLO_C8",NA,NA,NA,NA
+"32",297,676024.499718623,4509923.98939109,"F1","Fire Island 1","located between Bellport Beach and Old Inlet","FIIS","FIIS","2011-all ditches with nekton stations were considered tidal; one end of all sampled ditches were either open to the bay or to a neighboring creek with the other end filled in by vegetation","FIIS_F1",NA,NA,NA,NA
+"33",298,676613.020435769,4509882.13854192,"F2","Fire Island 2","located between Bellport and Old Inlet","FIIS","FIIS","2011-all sampled ditches were tidal (ie effected by bay tides); all sampled ditches were either open to the bay and/or to intersecting ditches. The ends of some ditches were filled in with vegetation at the southern end.  Ditches close to the bay tended to be a bit too wide to sample (can't reach across).","FIIS_F2",NA,NA,NA,NA
+"34",299,676293.296307267,4516754.33290288,"F3","Fire Island 3","located between Bellport and Old Inlet","FIIS","FIIS","2011-all ditches tidal to bay; all ditches plugged by vegetation at high marsh end with some overflowing into pools.","FIIS_F3",NA,NA,NA,NA
+"35",300,670756.744106063,4507002.16838461,"F4","Fire Island 4","located near Watch Hill","FIIS","FIIS","2011-all ditches plugged by vegetation to the bay on north side. Only the east 2 ditches tidal by openning to creek on south side. Other ditches flow into neighboring pools.","FIIS_F4",NA,NA,NA,NA
+"36",301,675553.842346693,4509523.12593969,"F5","Fire Island 5","located between Bellport and Old Inlet","FIIS","FIIS","2011-far east stations tidal, open to creek but closed at end by vegetation. Other ditches non-tidal, pretty stagnant.","FIIS_F5",NA,NA,NA,NA
+"37",302,687207.767572727,4514790.05270519,"F6","Fire Island 6","located near Great Gun","FIIS","FIIS","Near Great Gun.  Need Permit from Smith Point County Park to sample this site----need permission every year.","FIIS_F6",NA,NA,NA,NA
+"38",303,683738.017733612,4514390.72012314,"WF1","William Floyd 1","need to update","FIIS","WIFL","2011-most of the ditches along main ditch were tidal. End of main ditch blocked by a board, but tides do come in and out.","FIIS_WF1",NA,NA,NA,NA
+"39",304,684256.475185944,4514672.77524257,"WF2","William Floyd 2","need to update","FIIS","WIFL","2011-all ditches tidal, non directly connected to bay, but connected to other intersecting ditches that were.","FIIS_WF2",NA,NA,NA,NA
+"40",305,684010.508866999,4514515.630914,"WF3","William Floyd 3","need to update","FIIS","WIFL","2011-lower ditches all tidal, some closed at end by veg. ditches at north side near pools not really tidal. Water level doesn't really change much during tidal cycle.","FIIS_WF3",NA,NA,NA,NA
+"41",306,584616.816993464,4478101.66013072,"GSH1","GATE Sandy Hook 1","Salt Marsh","GATE","SHU","Horseshoe Cove","GATE_GSH1",NA,NA,NA,NA
+"42",307,585937.892307692,4476976.14871795,"GSH2","GATE Sandy Hook 2","Salt Marsh","GATE","SHU","Spermacetti Cove","GATE_GSH2",NA,NA,NA,NA
+"43",308,586145.756880734,4474823.03211009,"GSH3","GATE Sandy Hook 3","Salt Marsh","GATE","SHU","Southern Site","GATE_GSH3",NA,NA,NA,NA
+"44",309,331935.024539877,4228313.52760736,"G1","George Washington 1","Dancing Marsh","GEWA","GEWA",NA,"GEWA_G1",NA,NA,NA,NA
+"45",310,627131.951101103,4527217.83544816,"SAG1","SAGAMORE HILL 1","EEL CREEK","SAHI","SAHI","salt marsh easily accessible via nature trail / boardwalk. Usually can park in the staff lot at the museum.  
+
+Salt marsh is bordered by forested upland and dune / overwash area.","SAHI_SAG1",NA,NA,NA,NA
