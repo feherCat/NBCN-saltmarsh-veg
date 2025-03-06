@@ -2,6 +2,9 @@
 title: "Vegetation Monitoring at Assateague Island National Seashore: Salt Marsh Plant Community 2008 - 2018"
 output: 
   bookdown::html_document2:
+    number_sections: false
+    fig_caption: true
+    global_numbering: true
 params:
   park: "ASIS"
   fullname: "Assateague Island National Seashore"
@@ -12,7 +15,7 @@ bibliography: references.bib
 ---
 
 ```{r setup, message=FALSE, warning=TRUE, include=FALSE}
-pacman::p_load(tidyverse, AER, betareg, bookdown, cowplot, english, flextable, ftExtra, ggh4x, gt, here, janitor, knitr, lemon, lmtest, lubridate, margins, monochromeR, numDeriv, officedown, officer, pairwiseAdonis, printy, statmod, stringr, stringi, vegan, xfun)
+pacman::p_load(tidyverse, AER, betareg, bookdown, cowplot, english, flextable, ftExtra, ggh4x, gt, here, janitor, knitr, leaflet, lemon, lmtest, lubridate, margins, monochromeR, numDeriv, officedown, officer, pairwiseAdonis, plotly, printy, sf, statmod, stringr, stringi, rcartocolor, vegan, xfun)
 
 pacman::p_load_gh("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis", "tjmahr/printy")
 
@@ -24,6 +27,7 @@ knitr::opts_chunk$set(
 	warning = FALSE,
 	include = FALSE
 )
+
 knitr::knit_hooks$set(
   evaluate.inline = function (code, envir = knit_global()) {
     v = try(eval(xfun::parse_only(code), envir = envir))
@@ -44,35 +48,57 @@ veg_joined <- veg_joined %>% map(~filter(.x, UnitCode == params$park))
 source(here::here("R", "setup.R"))
 ```
 
-#### **Background**
+#### **Background** {.unnumbered}
 
 | The National Park Service Inventory and Monitoring (I&M) Program's Northeast Coastal and Barrier Network (NCBN) has identified salt marsh condition, in addition to several associated vital signs, as a high priority for long-term monitoring. The first iteration of the salt marsh vegetation monitoring protocol was originally developed by the USGS and University of Rhode Island for the purpose of comparing the vegetation community in hydrologically altered marshes to more pristine "control" marshes in order to understand the potential effects of hydrologic restoration on salt marsh habitats within Cape Cod National Seashore [@Roman2001]. This protocol was then adapted to measure change in the species composition and abundance of the salt marsh plant community at the other six coastal parks monitored by NCBN in response to a multitude of stressors such as hydrologic alteration, storms, visitor use, nutrient loading, watershed development, sea-level rise, and climate change, among others [@RocksStevens2018]. The salt marsh vegetation monitoring protocol was successfully implemented at `r params$park` over a period of `r study_years$max_year-study_years$min_year` years from `r study_years$min_year` to `r study_years$max_year` but was placed on hold in 2018 due to staffing and budget shortages. Annual summary reports for `r params$fullname` were published for 2008, 2010, 2012, and 2014 (DataStore saved search: 3465). To date, only a single trend analysis of the existing data has been conducted [@Peck2021]. Since this protocol was put on hold in 2018, resource management staff at several parks in the NCBN network have expressed interest in the results of the previous monitoring efforts. Thus, the objective of this report is to provide additional analysis of the existing data and interpretation of the results that may be useful to the parks' resource management staff.
 
-#### **Methods**
+#### **Methods** {.unnumbered}
 
-##### **Protocol (Vital Signs)**
+##### **Protocol (Vital Signs)** {.unnumbered}
 
 | NCBN's primary vegetation monitoring protocol is titled [Salt Marsh Vegetation](https://www.nps.gov/im/ncbn/salt-marsh-vegetation.htm). The salt marsh plant community was assessed by visually estimating the percent cover of each species within 50 replicate 1 m^2^ plots that were randomly established within each of `r nrow(site_descriptions$site_list)` sites [@RocksStevens2018]. `r as.character(str_to_title(english(site_descriptions$year_site_plot_count$site_count)))` sites were monitored biannually across `r as.character(english(site_descriptions$year_site_plot_count$year_count))` sampling events between `r site_descriptions$year_site_plot_count$min_year` to `r site_descriptions$year_site_plot_count$max_year` at a total of `r site_descriptions$year_site_plot_count$plot_count` plots ([Figure 1](#fig1)). All data utilized in this report are available for public use and can be downloaded using the [NPS DataStore](https://irma.nps.gov/DataStore/Reference/Profile/2268189).
 
-##### **TODO: create map of ASIS sites with sf package here**
+<br>
 
-![Figure 1. Salt marsh vegetation monitoring sites within Assateague Island National Seashore.](){#fig1}
+```{r map, include=TRUE, echo=FALSE, fig.cap=paste0("Salt marsh vegetation monitoring sites within ", params$fullname)}
+site_coords <- read_csv("data/site_coords.csv") %>%
+  filter(UnitCode == params$park & SiteName != "Tingles") %>%
+  st_as_sf(., coords = c("x_coord", "y_coord"), crs = 26918) %>%
+  st_transform(., crs = 4326) %>%
+  mutate(x_coord = st_coordinates(.)[,1],
+         y_coord = st_coordinates(.)[,2])
 
-##### **Analyses**
+leaflet(data = site_coords) %>%
+  addTiles() %>% # will need to replace with NPS park tiles 
+  fitBounds(lng1 = st_bbox(site_coords)[[1]], lng2 = st_bbox(site_coords)[[3]], lat1 = st_bbox(site_coords)[[2]], lat2 = st_bbox(site_coords)[[4]]) %>%
+  addMarkers(popup = ~SiteCode, label = ~SiteCode) %>%
+  addScaleBar() %>%
+  addEasyButton(easyButton(
+     icon = "ion-arrow-shrink", title = "Reset view",
+     onClick = JS("function(btn, map){ map.setView(map._initialCenter, map._initialZoom);}"))) %>% 
+    htmlwidgets::onRender(
+      JS(
+"
+function(el, x){ 
+  var map = this; 
+  map.whenReady(function(){
+    map._initialCenter = map.getCenter(); 
+    map._initialZoom = map.getZoom();
+  });
+}"
+      )
+    )
+```
 
-| Prior to analyses, the percent cover of each species in each plot was averaged up to the site-level as outlined in SOP 7 of the NCBN Salt Marsh Vegetation Monitoring Protocol [@RocksStevens2018]. Similarly, the site-level frequency of each species was calculated as the number of plots where each species was found divided by the total number of plots that were sampled at each site during each sampling event. Note that error values and error bars reported throughout the text represent standard errors. A list of all species found at `r params$park` is provided in [Appendix 1].
-| 
-| We first compared changes in the salt marsh plant community over time within the park using the following three metrics: mean total plot cover, species richness, and the number of species unique to each park. Mean total plot cover was calculated as the site-level mean of the sum of the cover of all species in each plot. Trends in mean total plot cover were estimated using beta regression models with a log-log link where the independent variable was time since the first sampling event and the dependent variable was the sum cover of all species in each plot averaged up to the site-level in each year. Species richness was calculated as the total number of distinct species found at each site during each sampling event. Similarly, the number of unique species was calculated as the count of species that were not found at the other five NCBN parks at each site during each sampling event. Trends in species richness and the count of unique species were estimated using generalized linear models with a poisson error distribution with a log link and an offset for the total number of plots measured within each site during each sampling event, where the independent variable was time since the first sampling event and the dependent variable was either species richness or the count of unique species at each site in each year.
-| 
-| In order to understand the changes occurring in specific species that may be important to park resource managers, we identified species that were either 1) classified as endangered, rare, threatened, or vulnerable at the federal level or by the state(s) of `r params$states`, 2) classified as either "management concern" or "exploitation concern" in [NPSpecies](https://irma.nps.gov/NPSpecies/), or 3) considered invasive, noxious, or prohibited by the state(s) of `r params$states`. Federally threatened and endangered species were identified based on the U.S. Fish and Wildlife Service's 2024 species list [@FWSTESpecies]. State-level threatened and endangered species and invasive species were identified based on the sources shown in [Appendix 2]. For each of the species that were identified using these three criteria, we estimated trends in the mean cover and frequency for each park using generalized linear models with a quasi-binomial error distribution with a log link and weights for the total number of plots measured within each site during each sampling event where the independent variable was time since the first sampling event and the dependent variable was either site-level mean cover or frequency.
-| 
-| Since salinity is known to be a key factor controlling plant community composition in coastal wetlands, we also compared changes over time in the count (i.e., richness), frequency, and mean percent cover of species with low, medium, and high salinity tolerance at each park. We used the salinity tolerance categories from the [USDA plants database](https://plants.usda.gov/) to categorize the salinity tolerance of each species as either low (\< 0.5 ppt), medium (0.5 to 18 ppt), or high (\> 18 ppt). Note that there were several species that did not have salinity tolerance classifications in the USDA plants database. The salinity tolerance of each species is shown in the species list for `r params$fullname` in [Appendix 1]. We estimated trends in the count of species in each salinity category at each park using generalized linear models with a poisson error distribution with a log link and an offset for the total number of plots measured within each site during each sampling event, where the independent variable was time since the first sampling event and the dependent variable was the total site-level count of species in each salinity tolerance category. Trends in the frequency or mean cover of species in each salinity tolerance category at each park were estimated using generalized linear models with a quasi-binomial error distribution with a log link and weights for the total number of plots measured within each site during each sampling event, where the independent variable was time since the first sampling event and the dependent variable was either site-level frequency or mean percent cover.
-| 
-| Finally, we compared changes in plant community composition over time at each park using permutational multivariate analysis of variance using distance matrices (ADONIS) via the 'adonis2' function from the R package 'vegan' where the independent variable was the sample year and the dependent variable was the site-level cover of each species [@R-vegan]. Although an analysis of similarities (a.k.a. ANOSIM) was recommended for trend analysis in the original NCBN salt marsh vegetation monitoring protocol, we opted to use the ADONIS model since ANOSIM can potentially confound the differences between groups with the dispersion within groups [@Warton2012]. For parks where the ADONIS model detected a significant difference between years, we used post-hoc pairwise comparisons with Benjamini and Hochberg corrections [@BenjaminiHochberg1995] via the function 'pairwise.adonis' in the R package 'pairwiseAdonis' to find the year-pairs with significant differences [@R-pairwiseAdonis]. Finally, we used the 'kruskal.test' function from the R package 'stats' to find the species with significantly different mean percent cover between the year pairs identified in the previous pairwise comparisons [@R-stats]. 
+<br>
 
-#### **Results**
+##### Analyses
 
-##### Total Plot Cover, Species Richness, & Unique Species
+| Prior to analyses, the percent cover of each species in each plot was averaged up to the site-level as outlined in SOP 7 of the NCBN Salt Marsh Vegetation Monitoring Protocol [@RocksStevens2018]. Similarly, the site-level frequency of each species was calculated as the number of plots where each species was found divided by the total number of plots that were sampled at each site during each sampling event. Note that error values and error bars reported throughout the text represent standard errors. A list of all species found at `r params$park` is provided in [Appendix 1]. Further details of the statistical methods used to analyze the data are provided at the end of the document.
+
+#### **Results** {.unnumbered}
+
+##### Total Plot Cover, Species Richness, & Unique Species {.unnumbered}
 
 ```{r Total Cover}
 source(here::here("R", "total_cover_dfs.R"))
@@ -91,13 +117,9 @@ unique_species <- unique_species_dfs(park = "ASIS")
 
 | Mean total plot cover over the entire study period was `r total_cover$results$mean_se_text`. Mean total plot cover at `r params$park` remained unchanged between `r study_years$min_year` to `r study_years$max_year` [Figure 2](#fig2). A total of `r species_richness$total_park_species_richness` species were identified across the entire study period. Total park-level species richness remained unchanged over the study period (mean: `r species_richness$results$mean_se_text`; Figure 3a). There were `r as.character(english(unique_species$park_unique_species_count))` species that were unique to `r params$park` including `r unique_species$park_unique_species_text %>% unlist("sp_list") %>% pluck("sp_list")`. The count of unique species remained unchanged over the study period (mean: `r unique_species$results$mean_se_text`; Figure 3a). Notably, `r as.character(english(unique_species$all_yrs_species %>% group_by(UnitCode) %>% summarise(count = n_distinct(SciName_cor)) %>% pluck("count")))` species were found in at least one plot during every sampling event, including `r unique_species$all_yrs_species_text %>% unlist("sp_list") %>% pluck("sp_list")`. A list of all species found at `r params$park` is provided in [Appendix 1]. A list of the species with the top 10 highest cover and frequency is provided in [Appendix 3].
 
-```{r, fig2, fig.cap="fff"}
+```{r fig2, fig.cap=paste0("Average total plot cover at ", params$fullname, ". The rate of change in mean total plot cover was not significant."), include=TRUE, echo=FALSE}
 source(here::here("R", "total_cover_plot.R"))
-
-print(ggdraw(total_cover_plot(), ylim = c(-0.15,1)) +
-  draw_label(bquote(bold("Figure 2.")~"Average total plot cover at"~.(params$park)*". The rate of change in mean total plot cover was not significant (i.e., rate of change = 0 %/yr)."), fontfamily = "serif", x = 0.02, y = 0.04, size = 12, hjust = 0) +
-  draw_label(bquote(plain("The rate of change in mean")), fontfamily = "serif", x = 0.02, y = -0.01, size = 12, hjust = 0) +
-  draw_label(bquote(plain("total plot cover was not significant (i.e., rate of change = 0 %/yr).")), fontfamily = "serif", x = 0.02, y = -0.06, size = 12, hjust = 0))
+ggplotly(total_cover_plot())
 ```
 
 ```{r Fig3-Species Richness & Unique Species, echo=FALSE}
@@ -114,7 +136,7 @@ ggdraw(species_richness_unique_plot(y_expansion = 0.4), ylim = c(-0.2,1)) +
 
  
 
-##### **3.2** Changes in Species Cover and Frequency
+##### **3.2** Changes in Species Cover and Frequency {.unnumbered}
 
 ```{r Changes in Species Cover and Frequency, message=FALSE, warning=FALSE, include=FALSE}
 source(here::here("R", "species_change_dfs.R"))
@@ -134,7 +156,7 @@ table_species_change()
 
  
 
-##### **3.2** Threatened, Endangered, & Rare Species
+##### **3.2** Threatened, Endangered, & Rare Species {.unnumbered}
 
 ```{r Threatened Endangered & Rare Species}
 source(here::here("R", "rare_te_species_dfs.R"))
@@ -143,7 +165,7 @@ rare_te_species <- rare_te_species_dfs()
 
 None of the species found at `r params$park` were considered federally threatened or endangered as of January 2025 (Department of the Interior, Fish and Wildlife Service, 50 CFR Part 17, Docket No. FWS-HQ-ES-2023-0018; FXES1113090FEDR-245-FF09E23000, RIN 1018-BF88). None of the species found at `r params$park`were considered endangered, rare, threatened, or vulnerable at the state level.  
 
-##### **3.3** Species of Management Concern
+##### **3.3** Species of Management Concern {.unnumbered}
 
 ```{r Species of Management Concern}
 source(here::here("R", "manage_species_dfs.R"))
@@ -152,7 +174,7 @@ manage_species <- manage_species_dfs()
 
 None of the species found at `r params$park` were noted as either 'management priority' or 'exploitation concern' within NPSpecies.  
 
-##### **3.4** Invasive, Noxious & Prohibited Species
+##### **3.4** Invasive, Noxious & Prohibited Species {.unnumbered}
 
 ```{r Invasive Species}
 source(here::here("R", "invasive_species_dfs.R"))
@@ -161,27 +183,39 @@ invasive_species <- invasive_species_dfs()
 
 No invasive species were found at `r params$park`.  
 
-##### **3.5** Salinity Tolerance
+##### **3.5** Salinity Tolerance {.unnumbered}
 
 ```{r Salinity Tolerance}
 source(here::here("R", "salinity_dfs.R"))
 salinity <- salinity_dfs()
 ```
 
-#### **Appendix 1**
+#### Analyses (cont.)
+
+| We first compared changes in the salt marsh plant community over time within the park using the following three metrics: mean total plot cover, species richness, and the number of species unique to each park. Mean total plot cover was calculated as the site-level mean of the sum of the cover of all species in each plot. Trends in mean total plot cover were estimated using beta regression models with a log-log link where the independent variable was time since the first sampling event and the dependent variable was the sum cover of all species in each plot averaged up to the site-level in each year. Species richness was calculated as the total number of distinct species found at each site during each sampling event. Similarly, the number of unique species was calculated as the count of species that were not found at the other five NCBN parks at each site during each sampling event. Trends in species richness and the count of unique species were estimated using generalized linear models with a poisson error distribution with a log link and an offset for the total number of plots measured within each site during each sampling event, where the independent variable was time since the first sampling event and the dependent variable was either species richness or the count of unique species at each site in each year.
+| 
+| In order to understand the changes occurring in specific species that may be important to park resource managers, we identified species that were either 1) classified as endangered, rare, threatened, or vulnerable at the federal level or by the state(s) of `r params$states`, 2) classified as either "management concern" or "exploitation concern" in [NPSpecies](https://irma.nps.gov/NPSpecies/), or 3) considered invasive, noxious, or prohibited by the state(s) of `r params$states`. Federally threatened and endangered species were identified based on the U.S. Fish and Wildlife Service's 2024 species list [@FWSTESpecies]. State-level threatened and endangered species and invasive species were identified based on the sources shown in [Appendix 2]. For each of the species that were identified using these three criteria, we estimated trends in the mean cover and frequency for each park using generalized linear models with a quasi-binomial error distribution with a log link and weights for the total number of plots measured within each site during each sampling event where the independent variable was time since the first sampling event and the dependent variable was either site-level mean cover or frequency.
+| 
+| Since salinity is known to be a key factor controlling plant community composition in coastal wetlands, we also compared changes over time in the count (i.e., richness), frequency, and mean percent cover of species with low, medium, and high salinity tolerance at each park. We used the salinity tolerance categories from the [USDA plants database](https://plants.usda.gov/) to categorize the salinity tolerance of each species as either low (\< 0.5 ppt), medium (0.5 to 18 ppt), or high (\> 18 ppt). Note that there were several species that did not have salinity tolerance classifications in the USDA plants database. The salinity tolerance of each species is shown in the species list for `r params$fullname` in [Appendix 1]. We estimated trends in the count of species in each salinity category at each park using generalized linear models with a poisson error distribution with a log link and an offset for the total number of plots measured within each site during each sampling event, where the independent variable was time since the first sampling event and the dependent variable was the total site-level count of species in each salinity tolerance category. Trends in the frequency or mean cover of species in each salinity tolerance category at each park were estimated using generalized linear models with a quasi-binomial error distribution with a log link and weights for the total number of plots measured within each site during each sampling event, where the independent variable was time since the first sampling event and the dependent variable was either site-level frequency or mean percent cover.
+| 
+| Finally, we compared changes in plant community composition over time at each park using permutational multivariate analysis of variance using distance matrices (ADONIS) via the 'adonis2' function from the R package 'vegan' where the independent variable was the sample year and the dependent variable was the site-level cover of each species [@R-vegan]. Although an analysis of similarities (a.k.a. ANOSIM) was recommended for trend analysis in the original NCBN salt marsh vegetation monitoring protocol, we opted to use the ADONIS model since ANOSIM can potentially confound the differences between groups with the dispersion within groups [@Warton2012]. For parks where the ADONIS model detected a significant difference between years, we used post-hoc pairwise comparisons with Benjamini and Hochberg corrections [@BenjaminiHochberg1995] via the function 'pairwise.adonis' in the R package 'pairwiseAdonis' to find the year-pairs with significant differences [@R-pairwiseAdonis]. Finally, we used the 'kruskal.test' function from the R package 'stats' to find the species with significantly different mean percent cover between the year pairs identified in the previous pairwise comparisons [@R-stats]. 
+
+<br>
+
+#### **Appendix 1** {.unnumbered}
 
 ```{r appd1}
 
 ```
 
-#### **Appendix 2**
+#### **Appendix 2** {.unnumbered}
 
 ```{r appd2}
 source(here::here("R", "appd2_fun.R"))
 appd2_fun()
 ```
 
-#### **Appendix 3**
+#### **Appendix 3** {.unnumbered}
 
 ```{r appd3}
 
